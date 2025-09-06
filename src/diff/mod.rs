@@ -8,39 +8,37 @@ use std::collections::HashSet;
 pub fn create_complete_side_by_side_with_diff(
     original: &str,
     current: &str,
-    diff_text: &str,
+    _diff_text: &str,
 ) -> (Vec<DisplayLine>, Vec<DisplayLine>, Vec<ChangeBlock>) {
     let original_lines: Vec<&str> = original.lines().collect();
     let current_lines: Vec<&str> = current.lines().collect();
 
-    // Parse diff to identify changed sections
-    let diff = parser::parse_diff(diff_text);
+    // Simple line-by-line comparison for change detection
     let mut changed_lines = HashSet::new();
 
-    if !diff.files.is_empty() {
-        for hunk in &diff.files[0].hunks {
-            for line in &hunk.lines {
-                match line {
-                    parser::Line::Deletion(content) => {
-                        // Mark this line as changed in original
-                        for (i, orig_line) in original_lines.iter().enumerate() {
-                            if orig_line.trim() == content.trim() {
-                                changed_lines.insert(i);
-                                break;
-                            }
-                        }
-                    }
-                    parser::Line::Addition(content) => {
-                        // Mark this line as changed in current
-                        for (i, curr_line) in current_lines.iter().enumerate() {
-                            if curr_line.trim() == content.trim() {
-                                changed_lines.insert(i);
-                                break;
-                            }
-                        }
-                    }
-                    _ => {}
+    // Compare lines and mark differences
+    let max_lines = original_lines.len().max(current_lines.len());
+    for i in 0..max_lines {
+        let orig_line = original_lines.get(i);
+        let curr_line = current_lines.get(i);
+
+        match (orig_line, curr_line) {
+            (Some(o), Some(c)) => {
+                // Both files have this line - check if content differs
+                if o != c {
+                    changed_lines.insert(i);
                 }
+            }
+            (Some(_), None) => {
+                // Line exists in original but not in current - deletion
+                changed_lines.insert(i);
+            }
+            (None, Some(_)) => {
+                // Line exists in current but not in original - addition
+                changed_lines.insert(i);
+            }
+            (None, None) => {
+                // Should not happen
             }
         }
     }
@@ -53,13 +51,21 @@ pub fn create_complete_side_by_side_with_diff(
     for i in 0..max_lines {
         let orig_line = original_lines.get(i);
         let curr_line = current_lines.get(i);
+        let is_changed = changed_lines.contains(&i);
 
         match (orig_line, curr_line) {
             (Some(o), Some(c)) => {
-                let is_changed = changed_lines.contains(&i);
+                // Both files have this line
+                let (old_line_type, new_line_type) = if is_changed {
+                    // Content differs - this is a modification
+                    (LineType::Deletion, LineType::Addition)
+                } else {
+                    // Content is the same
+                    (LineType::Context, LineType::Context)
+                };
 
                 // Calculate word-level highlights for modifications
-                let word_highlights = if is_changed && o != c {
+                let word_highlights = if is_changed {
                     calculate_word_diffs(o, c)
                 } else {
                     Vec::new()
@@ -67,26 +73,19 @@ pub fn create_complete_side_by_side_with_diff(
 
                 old_lines.push(DisplayLine {
                     content: o.to_string(),
-                    line_type: if is_changed && o != c {
-                        LineType::Deletion
-                    } else {
-                        LineType::Context
-                    },
+                    line_type: old_line_type,
                     original_line_num: Some(i + 1),
                     word_highlights: word_highlights.clone(),
                 });
                 new_lines.push(DisplayLine {
                     content: c.to_string(),
-                    line_type: if is_changed && o != c {
-                        LineType::Addition
-                    } else {
-                        LineType::Context
-                    },
+                    line_type: new_line_type,
                     original_line_num: Some(i + 1),
                     word_highlights,
                 });
             }
             (Some(o), None) => {
+                // Line exists in original but not in current - deletion
                 old_lines.push(DisplayLine {
                     content: o.to_string(),
                     line_type: LineType::Deletion,
@@ -101,6 +100,7 @@ pub fn create_complete_side_by_side_with_diff(
                 });
             }
             (None, Some(c)) => {
+                // Line exists in current but not in original - addition
                 old_lines.push(DisplayLine {
                     content: "".to_string(),
                     line_type: LineType::Empty,
