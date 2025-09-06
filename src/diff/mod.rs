@@ -8,37 +8,48 @@ use std::collections::HashSet;
 pub fn create_complete_side_by_side_with_diff(
     original: &str,
     current: &str,
-    _diff_text: &str,
+    diff_text: &str,
 ) -> (Vec<DisplayLine>, Vec<DisplayLine>, Vec<ChangeBlock>) {
     let original_lines: Vec<&str> = original.lines().collect();
     let current_lines: Vec<&str> = current.lines().collect();
 
-    // Simple line-by-line comparison for change detection
+    // Parse diff to identify changed sections using correct line number tracking
+    let diff = parser::parse_diff(diff_text);
     let mut changed_lines = HashSet::new();
+    let mut addition_lines = HashSet::new();
+    let mut deletion_lines = HashSet::new();
 
-    // Compare lines and mark differences
-    let max_lines = original_lines.len().max(current_lines.len());
-    for i in 0..max_lines {
-        let orig_line = original_lines.get(i);
-        let curr_line = current_lines.get(i);
+    if !diff.files.is_empty() {
+        for hunk in &diff.files[0].hunks {
+            let mut old_line = hunk.old_start;
+            let mut new_line = hunk.new_start;
 
-        match (orig_line, curr_line) {
-            (Some(o), Some(c)) => {
-                // Both files have this line - check if content differs
-                if o != c {
-                    changed_lines.insert(i);
+            for line in &hunk.lines {
+                match line {
+                    parser::Line::Context(_) => {
+                        // Context lines are unchanged, just advance line counters
+                        old_line += 1;
+                        new_line += 1;
+                    }
+                    parser::Line::Deletion(_) => {
+                        // Deletion exists at old_line in original file
+                        if old_line <= original_lines.len() {
+                            let index = old_line as usize;
+                            deletion_lines.insert(index);
+                            changed_lines.insert(index);
+                        }
+                        old_line += 1;
+                    }
+                    parser::Line::Addition(_) => {
+                        // Addition exists at new_line in current file
+                        if new_line <= current_lines.len() {
+                            let index = new_line as usize;
+                            addition_lines.insert(index);
+                            changed_lines.insert(index);
+                        }
+                        new_line += 1;
+                    }
                 }
-            }
-            (Some(_), None) => {
-                // Line exists in original but not in current - deletion
-                changed_lines.insert(i);
-            }
-            (None, Some(_)) => {
-                // Line exists in current but not in original - addition
-                changed_lines.insert(i);
-            }
-            (None, None) => {
-                // Should not happen
             }
         }
     }
@@ -51,21 +62,33 @@ pub fn create_complete_side_by_side_with_diff(
     for i in 0..max_lines {
         let orig_line = original_lines.get(i);
         let curr_line = current_lines.get(i);
-        let is_changed = changed_lines.contains(&i);
 
         match (orig_line, curr_line) {
             (Some(o), Some(c)) => {
-                // Both files have this line
-                let (old_line_type, new_line_type) = if is_changed {
-                    // Content differs - this is a modification
+                let is_changed = changed_lines.contains(&i);
+                let is_addition = addition_lines.contains(&i);
+                let is_deletion = deletion_lines.contains(&i);
+
+                // Determine line type based on diff analysis
+                let (old_line_type, new_line_type) = if is_deletion && is_addition {
+                    // This line was modified (deletion + addition at same position)
                     (LineType::Deletion, LineType::Addition)
+                } else if is_deletion {
+                    // Pure deletion - line only exists in old
+                    (LineType::Deletion, LineType::Empty)
+                } else if is_addition {
+                    // Pure addition - line only exists in new
+                    (LineType::Empty, LineType::Addition)
+                } else if is_changed {
+                    // Context line in changed region
+                    (LineType::Context, LineType::Context)
                 } else {
-                    // Content is the same
+                    // Unchanged line
                     (LineType::Context, LineType::Context)
                 };
 
                 // Calculate word-level highlights for modifications
-                let word_highlights = if is_changed {
+                let word_highlights = if o != c && (is_deletion || is_addition) {
                     calculate_word_diffs(o, c)
                 } else {
                     Vec::new()
@@ -85,7 +108,6 @@ pub fn create_complete_side_by_side_with_diff(
                 });
             }
             (Some(o), None) => {
-                // Line exists in original but not in current - deletion
                 old_lines.push(DisplayLine {
                     content: o.to_string(),
                     line_type: LineType::Deletion,
@@ -100,7 +122,6 @@ pub fn create_complete_side_by_side_with_diff(
                 });
             }
             (None, Some(c)) => {
-                // Line exists in current but not in original - addition
                 old_lines.push(DisplayLine {
                     content: "".to_string(),
                     line_type: LineType::Empty,
@@ -114,7 +135,9 @@ pub fn create_complete_side_by_side_with_diff(
                     word_highlights: Vec::new(),
                 });
             }
-            _ => {}
+            (None, None) => {
+                // This shouldn't happen in normal diff scenarios, but handle it gracefully
+            }
         }
     }
 
