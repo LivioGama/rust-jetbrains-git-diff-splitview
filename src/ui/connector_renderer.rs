@@ -116,33 +116,108 @@ impl ConnectorRenderer {
                             format!("block_{}", block_idx),
                         );
 
-                        // Draw the connector ribbon
-                        let points = vec![curve.start, curve.control1, curve.control2, curve.end];
+                        // Calculate block height for multi-line detection
+                        let left_block_height =
+                            (left_end - left_start + 1) as f32 * self.theme.line_height;
+                        let right_block_height =
+                            (right_end - right_start + 1) as f32 * self.theme.line_height;
+                        let max_block_height = left_block_height.max(right_block_height);
 
-                        painter.add(egui::epaint::Shape::CubicBezier(
-                            egui::epaint::CubicBezierShape {
-                                points: [curve.start, curve.control1, curve.control2, curve.end],
-                                closed: false,
-                                fill: Color32::TRANSPARENT,
-                                stroke: Stroke::new(
-                                    curve.thickness,
-                                    curve.color.gamma_multiply(0.8),
-                                ),
-                            },
-                        ));
+                        // Determine if this is a multi-line block
+                        let is_multi_line =
+                            (left_end - left_start) > 0 || (right_end - right_start) > 0;
 
-                        // Add subtle fill for the connector band
-                        if (left_end - left_start) > 0 || (right_end - right_start) > 0 {
-                            let fill_color = curve.color.gamma_multiply(0.3);
-                            painter.add(egui::epaint::Shape::convex_polygon(
-                                points,
-                                fill_color,
-                                Stroke::NONE,
+                        if is_multi_line {
+                            // Create larger filled region for multi-line blocks positioned at bottom/top
+                            self.draw_filled_connector_region(
+                                painter,
+                                &curve,
+                                max_block_height,
+                                left_block_height,
+                                right_block_height,
+                                &left_rects,
+                                &right_rects,
+                                *left_start,
+                                *left_end,
+                                *right_start,
+                                *right_end,
+                            );
+                        } else {
+                            // Draw simple Bézier curve for single-line blocks
+                            painter.add(egui::epaint::Shape::CubicBezier(
+                                egui::epaint::CubicBezierShape {
+                                    points: [
+                                        curve.start,
+                                        curve.control1,
+                                        curve.control2,
+                                        curve.end,
+                                    ],
+                                    closed: false,
+                                    fill: Color32::TRANSPARENT,
+                                    stroke: Stroke::new(
+                                        curve.thickness,
+                                        curve.color.gamma_multiply(0.8),
+                                    ),
+                                },
                             ));
                         }
                     }
                 }
             }
+        }
+    }
+
+    fn draw_filled_connector_region(
+        &self,
+        painter: &egui::Painter,
+        curve: &crate::models::types::ConnectorCurve,
+        block_height: f32,
+        left_block_height: f32,
+        right_block_height: f32,
+        left_rects: &[Rect],
+        right_rects: &[Rect],
+        left_start: usize,
+        left_end: usize,
+        right_start: usize,
+        right_end: usize,
+    ) {
+        // Calculate semi-transparent fill color
+        let fill_color = curve.color.gamma_multiply(0.35); // 35% opacity for good visibility
+
+        // Use actual line rectangles to calculate the filled region bounds
+        if left_start < left_rects.len() && right_start < right_rects.len() {
+            let left_first_rect = &left_rects[left_start];
+            let left_last_rect = &left_rects[left_end.min(left_rects.len() - 1)];
+            let right_first_rect = &right_rects[right_start];
+            let right_last_rect = &right_rects[right_end.min(right_rects.len() - 1)];
+
+            // Calculate the bounds of all rectangles in the block
+            let left_min_x = left_first_rect.min.x;
+            let left_max_x = left_last_rect.max.x;
+            let right_min_x = right_first_rect.min.x;
+            let right_max_x = right_last_rect.max.x;
+
+            let top_y = left_first_rect.min.y.min(right_first_rect.min.y);
+            let bottom_y = left_last_rect.max.y.max(right_last_rect.max.y);
+
+            // Create rectangle covering the entire block area
+            let block_rect = Rect::from_min_max(
+                Pos2::new(left_max_x, top_y),
+                Pos2::new(right_min_x, bottom_y),
+            );
+
+            // Fill the rectangle with semi-transparent color
+            painter.add(egui::epaint::Shape::rect_filled(
+                block_rect, 0.0, // No corner radius
+                fill_color,
+            ));
+
+            // Draw outline around the filled area
+            painter.add(egui::epaint::Shape::rect_stroke(
+                block_rect,
+                0.0, // No corner radius
+                Stroke::new(curve.thickness * 1.5, curve.color.gamma_multiply(0.9)),
+            ));
         }
     }
 
