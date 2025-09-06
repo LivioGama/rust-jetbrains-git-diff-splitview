@@ -30,16 +30,12 @@ impl ScrollSync {
 
     pub fn set_left_scroll(&mut self, offset: f32) {
         self.left_scroll_offset = offset;
-        if self.master_pane != MasterPane::Right {
-            self.master_pane = MasterPane::Left;
-        }
+        self.master_pane = MasterPane::Left;
     }
 
     pub fn set_right_scroll(&mut self, offset: f32) {
         self.right_scroll_offset = offset;
-        if self.master_pane != MasterPane::Left {
-            self.master_pane = MasterPane::Right;
-        }
+        self.master_pane = MasterPane::Right;
     }
 
     pub fn left_scroll_offset(&self) -> f32 {

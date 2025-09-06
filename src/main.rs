@@ -305,15 +305,18 @@ impl eframe::App for DiffViewerApp {
                                 // Content area with scrolling - now with proper height allocation
                                 let available_height = ui.available_height();
 
-                                let left_scroll_offset = if self.scroll_sync.master_pane()
-                                    == MasterPane::Right
-                                {
-                                    self.scroll_sync.left_scroll_offset()
-                                } else {
-                                    ui.ctx().memory_mut(|mem| {
-                                        mem.data.get_persisted("left_scroll".into()).unwrap_or(0.0)
-                                    })
-                                };
+                                // Get current scroll position from memory
+                                let current_left_scroll = ui.ctx().memory_mut(|mem| {
+                                    mem.data.get_persisted("left_scroll".into()).unwrap_or(0.0)
+                                });
+
+                                // Calculate synchronized position if right pane is master
+                                let left_scroll_offset =
+                                    if self.scroll_sync.master_pane() == MasterPane::Right {
+                                        self.scroll_sync.left_scroll_offset()
+                                    } else {
+                                        current_left_scroll
+                                    };
 
                                 let scroll_output = ScrollArea::vertical()
                                     .id_source("diff_left_scroll")
@@ -389,15 +392,18 @@ impl eframe::App for DiffViewerApp {
                                 // Content area with scrolling - now with proper height allocation
                                 let available_height = ui.available_height();
 
-                                let right_scroll_offset = if self.scroll_sync.master_pane()
-                                    == MasterPane::Left
-                                {
-                                    self.scroll_sync.right_scroll_offset()
-                                } else {
-                                    ui.ctx().memory_mut(|mem| {
-                                        mem.data.get_persisted("right_scroll".into()).unwrap_or(0.0)
-                                    })
-                                };
+                                // Get current scroll position from memory
+                                let current_right_scroll = ui.ctx().memory_mut(|mem| {
+                                    mem.data.get_persisted("right_scroll".into()).unwrap_or(0.0)
+                                });
+
+                                // Calculate synchronized position if left pane is master
+                                let right_scroll_offset =
+                                    if self.scroll_sync.master_pane() == MasterPane::Left {
+                                        self.scroll_sync.right_scroll_offset()
+                                    } else {
+                                        current_right_scroll
+                                    };
 
                                 let scroll_output = ScrollArea::vertical()
                                     .id_source("diff_right_scroll")
