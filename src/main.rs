@@ -25,7 +25,7 @@ fn main() -> Result<(), eframe::Error> {
     // Read complete files and apply diff highlighting
     let original_content = std::process::Command::new("sh")
         .arg("-c")
-        .arg("cd /Users/livio/Documents/anbiti-apps/apps/reflecta && git show HEAD:app/api/completion/route.ts")
+        .arg("cd /Users/livio/Documents/anbiti-apps && git show HEAD:apps/reflecta/app/api/completion/route.ts")
         .output()
         .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
         .unwrap_or_else(|_| "Error reading original TypeScript file".to_string());
@@ -38,7 +38,7 @@ fn main() -> Result<(), eframe::Error> {
     // Get git diff to identify changes
     let diff_text = std::process::Command::new("sh")
         .arg("-c")
-        .arg("cd /Users/livio/Documents/anbiti-apps/apps/reflecta && git diff HEAD -- app/api/completion/route.ts")
+        .arg("cd /Users/livio/Documents/anbiti-apps && git diff HEAD -- apps/reflecta/app/api/completion/route.ts")
         .output()
         .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
         .unwrap_or_else(|_| "".to_string());
