@@ -1,0 +1,7 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+Do not run cargo run or cargo build the project is hot reloaded.
+Run cargo check and fix errors
