@@ -276,7 +276,7 @@ impl eframe::App for DiffViewerApp {
                 let total_height = ui.available_height();
                 let total_width = ui.available_width();
                 let pane_width = (total_width - 45.0) / 2.0; // 45px for connector column
-                
+
                 // Create a horizontal layout with explicit height allocation
                 ui.allocate_ui_with_layout(
                     Vec2::new(total_width, total_height),
@@ -287,56 +287,68 @@ impl eframe::App for DiffViewerApp {
                             Vec2::new(pane_width, total_height),
                             egui::Layout::top_down(egui::Align::LEFT),
                             |ui| {
+                                // Header
+                                ui.horizontal(|ui| {
+                                    ui.add_space(10.0);
+                                    ui.label(
+                                        egui::RichText::new("Original")
+                                            .font(FontId::new(
+                                                self.theme.font_size * 1.1,
+                                                egui::FontFamily::Proportional,
+                                            ))
+                                            .color(self.theme.foreground),
+                                    );
+                                });
 
-                        // Header
-                        ui.horizontal(|ui| {
-                            ui.add_space(10.0);
-                            ui.label(
-                                egui::RichText::new("Original")
-                                    .font(FontId::new(
-                                        self.theme.font_size * 1.1,
-                                        egui::FontFamily::Proportional,
-                                    ))
-                                    .color(self.theme.foreground),
-                            );
-                        });
+                                ui.separator();
 
-                        ui.separator();
+                                // Content area with scrolling - now with proper height allocation
+                                let available_height = ui.available_height();
 
-                        // Content area with scrolling - now with proper height allocation
-                        let available_height = ui.available_height();
-                        
-                        let scroll_output = ScrollArea::vertical()
-                            .id_source("diff_left_scroll")
-                            .auto_shrink([false, false])
-                            .max_height(available_height)
-                            .min_scrolled_height(available_height)
-                            .show(ui, |ui| {
-                                let mut line_rects = Vec::new();
+                                let left_scroll_offset = if self.scroll_sync.master_pane()
+                                    == MasterPane::Right
+                                {
+                                    self.scroll_sync.left_scroll_offset()
+                                } else {
+                                    ui.ctx().memory_mut(|mem| {
+                                        mem.data.get_persisted("left_scroll".into()).unwrap_or(0.0)
+                                    })
+                                };
 
-                                for (line_idx, line) in self.old_lines.iter().enumerate() {
-                                    let rect = self.render_line(ui, line, line_idx, true);
-                                    line_rects.push(rect);
-                                }
+                                let scroll_output = ScrollArea::vertical()
+                                    .id_source("diff_left_scroll")
+                                    .auto_shrink([false, false])
+                                    .max_height(available_height)
+                                    .min_scrolled_height(available_height)
+                                    .scroll_offset(Vec2::new(0.0, left_scroll_offset))
+                                    .show(ui, |ui| {
+                                        let mut line_rects = Vec::new();
+
+                                        for (line_idx, line) in self.old_lines.iter().enumerate() {
+                                            let rect = self.render_line(ui, line, line_idx, true);
+                                            line_rects.push(rect);
+                                        }
+
+                                        ui.ctx().memory_mut(|mem| {
+                                            mem.data
+                                                .insert_persisted("left_rects".into(), line_rects);
+                                        });
+                                    });
+
+                                self.scroll_sync
+                                    .set_left_scroll(scroll_output.state.offset.y);
+
+                                // Synchronize right pane based on left pane scroll
+                                self.scroll_sync.synchronize_scrolls(|y| {
+                                    map_left_to_right(y, &self.mapping_segments)
+                                });
 
                                 ui.ctx().memory_mut(|mem| {
-                                    mem.data.insert_persisted("left_rects".into(), line_rects);
+                                    mem.data.insert_persisted(
+                                        "left_scroll".into(),
+                                        scroll_output.state.offset.y,
+                                    );
                                 });
-                            });
-
-                        self.scroll_sync
-                            .set_left_scroll(scroll_output.state.offset.y);
-
-                        // Synchronize right pane based on left pane scroll
-                        self.scroll_sync
-                            .synchronize_scrolls(|y| map_left_to_right(y, &self.mapping_segments));
-
-                        ui.ctx().memory_mut(|mem| {
-                            mem.data.insert_persisted(
-                                "left_scroll".into(),
-                                scroll_output.state.offset.y,
-                            );
-                        });
                             },
                         );
 
@@ -359,56 +371,68 @@ impl eframe::App for DiffViewerApp {
                             Vec2::new(pane_width, total_height),
                             egui::Layout::top_down(egui::Align::LEFT),
                             |ui| {
+                                // Header
+                                ui.horizontal(|ui| {
+                                    ui.add_space(10.0);
+                                    ui.label(
+                                        egui::RichText::new("Modified")
+                                            .font(FontId::new(
+                                                self.theme.font_size * 1.1,
+                                                egui::FontFamily::Proportional,
+                                            ))
+                                            .color(self.theme.foreground),
+                                    );
+                                });
 
-                        // Header
-                        ui.horizontal(|ui| {
-                            ui.add_space(10.0);
-                            ui.label(
-                                egui::RichText::new("Modified")
-                                    .font(FontId::new(
-                                        self.theme.font_size * 1.1,
-                                        egui::FontFamily::Proportional,
-                                    ))
-                                    .color(self.theme.foreground),
-                            );
-                        });
+                                ui.separator();
 
-                        ui.separator();
+                                // Content area with scrolling - now with proper height allocation
+                                let available_height = ui.available_height();
 
-                        // Content area with scrolling - now with proper height allocation
-                        let available_height = ui.available_height();
-                        
-                        let scroll_output = ScrollArea::vertical()
-                            .id_source("diff_right_scroll")
-                            .auto_shrink([false, false])
-                            .max_height(available_height)
-                            .min_scrolled_height(available_height)
-                            .show(ui, |ui| {
-                                let mut line_rects = Vec::new();
+                                let right_scroll_offset = if self.scroll_sync.master_pane()
+                                    == MasterPane::Left
+                                {
+                                    self.scroll_sync.right_scroll_offset()
+                                } else {
+                                    ui.ctx().memory_mut(|mem| {
+                                        mem.data.get_persisted("right_scroll".into()).unwrap_or(0.0)
+                                    })
+                                };
 
-                                for (line_idx, line) in self.new_lines.iter().enumerate() {
-                                    let rect = self.render_line(ui, line, line_idx, false);
-                                    line_rects.push(rect);
-                                }
+                                let scroll_output = ScrollArea::vertical()
+                                    .id_source("diff_right_scroll")
+                                    .auto_shrink([false, false])
+                                    .max_height(available_height)
+                                    .min_scrolled_height(available_height)
+                                    .scroll_offset(Vec2::new(0.0, right_scroll_offset))
+                                    .show(ui, |ui| {
+                                        let mut line_rects = Vec::new();
+
+                                        for (line_idx, line) in self.new_lines.iter().enumerate() {
+                                            let rect = self.render_line(ui, line, line_idx, false);
+                                            line_rects.push(rect);
+                                        }
+
+                                        ui.ctx().memory_mut(|mem| {
+                                            mem.data
+                                                .insert_persisted("right_rects".into(), line_rects);
+                                        });
+                                    });
+
+                                self.scroll_sync
+                                    .set_right_scroll(scroll_output.state.offset.y);
+
+                                // Synchronize left pane based on right pane scroll
+                                self.scroll_sync.synchronize_scrolls(|y| {
+                                    map_right_to_left(y, &self.mapping_segments)
+                                });
 
                                 ui.ctx().memory_mut(|mem| {
-                                    mem.data.insert_persisted("right_rects".into(), line_rects);
+                                    mem.data.insert_persisted(
+                                        "right_scroll".into(),
+                                        scroll_output.state.offset.y,
+                                    );
                                 });
-                            });
-
-                        self.scroll_sync
-                            .set_right_scroll(scroll_output.state.offset.y);
-
-                        // Synchronize left pane based on right pane scroll
-                        self.scroll_sync
-                            .synchronize_scrolls(|y| map_right_to_left(y, &self.mapping_segments));
-
-                        ui.ctx().memory_mut(|mem| {
-                            mem.data.insert_persisted(
-                                "right_scroll".into(),
-                                scroll_output.state.offset.y,
-                            );
-                        });
                             },
                         );
                     },
