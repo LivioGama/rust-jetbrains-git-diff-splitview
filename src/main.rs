@@ -1,25 +1,69 @@
-import {getSystemInstructionsFor} from '@/lib/helpers/personality'
-import {streamText} from 'ai'
-import {openai} from '@ai-sdk/openai'
+// diffsplit/src/main.rs
+// Modular JetBrains Git Diff Viewer
+use eframe::egui;
 
-export const runtime = 'edge'
+// Module declarations
+mod app;
+mod diff;
+mod models;
+mod sync;
+mod theme;
+mod ui;
 
-export const POST = async (req: Request) => {
-  const {messages, selectedType} = await req.json()
+// Re-exports for convenience
+use app::*;
+use diff::*;
 
-  const systemMessage = {role: 'system', content: getSystemInstructionsFor(selectedType)}
-  const conversationMessages = Array.isArray(messages) ? messages : [{role: 'user', content: messages.trim()}]
+fn main() -> Result<(), eframe::Error> {
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([1600.0, 1000.0])
+            .with_resizable(true),
+        ..Default::default()
+    };
 
-  const result = streamText({
-    model: openai('gpt-4.1'),
-    messages: [systemMessage, ...conversationMessages],
-    temperature: 0.5,
-  })
+    // Read complete files and apply diff highlighting
+    let original_content = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("cd /Users/livio/Documents/anbiti-apps/apps/reflecta && git show HEAD:app/api/completion/route.ts")
+        .output()
+        .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
+        .unwrap_or_else(|_| "Error reading original TypeScript file".to_string());
 
-  return result.toDataStreamResponse({
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    },
-  })
+    let current_content = std::fs::read_to_string(
+        "/Users/livio/Documents/anbiti-apps/apps/reflecta/app/api/completion/route.ts",
+    )
+    .unwrap_or_else(|_| "Error reading current TypeScript file".to_string());
+
+    // Get git diff to identify changes
+    let diff_text = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("cd /Users/livio/Documents/anbiti-apps/apps/reflecta && git diff HEAD -- app/api/completion/route.ts")
+        .output()
+        .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
+        .unwrap_or_else(|_| "".to_string());
+
+    // Create complete side-by-side display with diff highlighting
+    let (old_lines, new_lines, change_blocks) =
+        create_complete_side_by_side_with_diff(&original_content, &current_content, &diff_text);
+
+    // Build enhanced data structures for better functionality
+    let line_height = 18.0;
+    let anchors = sync::build_anchors_from_blocks(&change_blocks, line_height);
+    let mapping_segments = sync::build_mapping_segments(&anchors);
+
+    // Run the application
+    eframe::run_native(
+        "JetBrains Diff Viewer - Modular",
+        options,
+        Box::new(|_cc| {
+            Box::new(DiffViewerApp::new(
+                old_lines,
+                new_lines,
+                change_blocks,
+                anchors,
+                mapping_segments,
+            ))
+        }),
+    )
 }
