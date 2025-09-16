@@ -48,7 +48,8 @@ impl LineRenderer {
 
         // Draw JetBrains-style highlight for changed lines
         if line.line_type != LineType::Context {
-            self.highlight_renderer.draw_highlight(ui, rect);
+            self.highlight_renderer
+                .draw_highlight(ui, rect, &line.line_type);
         } else if bg_color != Color32::TRANSPARENT {
             // Fill background for the entire line for context changes
             ui.painter().rect_filled(rect, 0.0, bg_color);
@@ -135,12 +136,8 @@ impl LineRenderer {
                         );
 
                         // Word-level highlight with improved JetBrains colors
-                        let highlight_color = match line.line_type {
-                            LineType::Context => {
-                                Color32::from_rgba_unmultiplied(187, 222, 251, 120)
-                            } // Blue for modifications
-                            _ => Color32::from_rgba_unmultiplied(255, 193, 7, 100), // Yellow for conflicts
-                        };
+                        // Use unified blue color for all word highlights
+                        let highlight_color = Color32::from_rgba_premultiplied(33, 150, 243, 64);
 
                         ui.painter()
                             .rect_filled(highlight_rect, 0.0, highlight_color);

@@ -24,18 +24,11 @@ mod utils;
 // Re-exports for convenience
 use actions::*;
 use app::*;
-use config::*;
+use core::*;
 use diff::*;
-use file_ops::*;
+use file_ops::FileOps;
 use git::{GitOps, GitResult};
-use models::*;
-use navigation::*;
-use rendering::*;
 use state::*;
-use sync::*;
-use theme::*;
-use ui::*;
-use utils::*;
 
 fn main() -> Result<(), eframe::Error> {
     println!("🚀 Starting JetBrains Diff Viewer - Modular Edition");
@@ -90,20 +83,30 @@ fn main() -> Result<(), eframe::Error> {
         "/Users/livio/Documents/anbiti-apps/apps/app/app/Providers.tsx",
     ) {
         Ok(content) => {
-            println!("✅ Got current content ({} chars)", content.len());
+            println!("✅ Read current content ({} chars)", content.len());
             content
         }
         Err(e) => {
-            println!("❌ Failed to read current file: {}, using fallback", e);
-            "function App() {\n  return <div>Hello World - Modified</div>;\n}\n\nexport default App;\n".to_string()
+            println!("❌ Failed to read current file ({}), using fallback", e);
+            match file_ops.read_current_content() {
+                Ok(content) => {
+                    println!("✅ Using fallback content ({} chars)", content.len());
+                    content
+                }
+                Err(e2) => {
+                    println!("❌ Fallback also failed ({}), using default", e2);
+                    "function App() {\n  return <div>Hello World</div>;\n}\n\nexport default App;\n"
+                        .to_string()
+                }
+            }
         }
     };
 
-    // Try to get Git diff, with fallback
-    println!("🔍 Getting Git diff...");
+    // Try to get diff from Git, with fallback
+    println!("📖 Reading diff content...");
     let diff_text = match git_ops.diff_file(
         Some("cb2752b3"),
-        Some("dcc2893b"),
+        Some("HEAD"),
         "apps/app/app/Providers.tsx",
     ) {
         GitResult {
@@ -111,21 +114,13 @@ fn main() -> Result<(), eframe::Error> {
             stdout,
             ..
         } => {
-            println!("✅ Got Git diff ({} chars)", stdout.len());
+            println!("✅ Got diff content ({} chars)", stdout.len());
             stdout
         }
         _ => {
-            println!("❌ Failed to get Git diff, trying fallback...");
-            match file_ops.get_git_diff() {
-                Ok(diff) => {
-                    println!("✅ Using fallback diff ({} chars)", diff.len());
-                    diff
-                }
-                Err(_) => {
-                    println!("❌ Fallback diff also failed, using empty diff");
-                    "".to_string()
-                }
-            }
+            println!("❌ Failed to read diff, using default");
+            "diff --git a/apps/app/app/Providers.tsx b/apps/app/app/Providers.tsx\nindex cb2752b..dcc2893b 100644\n--- a/apps/app/app/Providers.tsx\n+++ b/apps/app/app/Providers.tsx\n@@ -1,5 +1,6 @@\n import React from 'react';\n import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';\n import { ThemeProvider } from './theme';\n import { AuthProvider } from './auth';\n+import { NotificationProvider } from './notifications';\n\n function AppProviders({ children }) {\n   return (\n@@ -7,6 +8,9 @@\n       <AuthProvider>\n+        <NotificationProvider>\n           <Router>\n             {children}\n+          </Router>\n+        </NotificationProvider>\n       </AuthProvider>\n     </ThemeProvider>\n   );\n }\n"
+                .to_string()
         }
     };
 
@@ -145,6 +140,8 @@ fn main() -> Result<(), eframe::Error> {
     let line_height = 18.0;
     let anchors = sync::build_anchors_from_blocks(&change_blocks, line_height);
     let mapping_segments = sync::build_mapping_segments(&anchors);
+
+    // Git operations already initialized above
 
     // Initialize state manager and action handler
     let mut state_manager = StateManager::new();

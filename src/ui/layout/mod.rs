@@ -183,8 +183,8 @@ impl LayoutManager {
                     let x1 = gutter_x_start - 1.0; // Extend into left pane
                     let x2 = gutter_x_end + 1.0; // Extend into right pane
 
-                    // Use a neutral color for hunk connectors
-                    let color = egui::Color32::from_rgba_unmultiplied(100, 150, 200, 120);
+                    // Use unified blue color for hunk connectors
+                    let color = egui::Color32::from_rgba_premultiplied(33, 150, 243, 64);
 
                     // Draw the S-shaped connector linking the two hunks
                     self.draw_connector(
@@ -517,9 +517,9 @@ impl LayoutManager {
                                     let x1 = full_rect.left() - 1.0; // Extend into left pane
                                     let x2 = full_rect.right() + 1.0; // Extend into right pane
 
-                                    // Use a neutral color for hunk connectors (like JetBrains)
+                                    // Use unified blue color for hunk connectors
                                     let color =
-                                        egui::Color32::from_rgba_unmultiplied(100, 150, 200, 120);
+                                        egui::Color32::from_rgba_premultiplied(33, 150, 243, 64);
 
                                     // Draw the S-shaped connector linking the two hunks
                                     connector_renderer.draw_connector(

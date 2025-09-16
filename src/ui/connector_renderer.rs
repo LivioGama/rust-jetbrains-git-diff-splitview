@@ -87,12 +87,7 @@ impl ConnectorRenderer {
             ));
 
             // Draw subtle outline around the filled area for definition
-            painter.add(egui::epaint::Shape::rect_stroke(
-                block_rect,
-                2.0,                                               // Matching corner radius
-                Stroke::new(1.0, curve.color.gamma_multiply(0.6)), // Thinner, more subtle outline
-                StrokeKind::Middle,
-            ));
+            // Remove stroke outline - using filled shape only
         }
     }
 
@@ -113,13 +108,8 @@ impl ConnectorRenderer {
 
         let painter = ui.painter();
 
-        // Get the color based on change type
-        let stroke_color = match change_type {
-            "addition" => Color32::from_rgb(80, 160, 80), // Green for additions
-            "deletion" => Color32::from_rgb(160, 80, 80), // Red for deletions
-            "modification" => Color32::from_rgb(160, 160, 80), // Yellow for modifications
-            _ => Color32::from_rgb(100, 150, 200),        // Default blue
-        };
+        // Use unified blue color for all connectors
+        let stroke_color = Color32::from_rgb(33, 150, 243);
 
         // Calculate the vertical span of the change blocks
         let left_top = left_rects[left_start].min.y;
@@ -152,8 +142,8 @@ impl ConnectorRenderer {
             egui::epaint::CubicBezierShape {
                 points: [start_top, control1_top, control2_top, end_top],
                 closed: false,
-                fill: Color32::TRANSPARENT,
-                stroke: Stroke::new(2.0, stroke_color).into(),
+                fill: stroke_color,
+                stroke: egui::epaint::PathStroke::NONE,
             },
         ));
 
@@ -165,24 +155,18 @@ impl ConnectorRenderer {
             egui::epaint::CubicBezierShape {
                 points: [start_bottom, control1_bottom, control2_bottom, end_bottom],
                 closed: false,
-                fill: Color32::TRANSPARENT,
-                stroke: Stroke::new(2.0, stroke_color).into(),
+                fill: stroke_color,
+                stroke: egui::epaint::PathStroke::NONE,
             },
         ));
 
         // Draw vertical connecting lines to create a band effect
         if (left_bottom - left_top).abs() > 1.0 {
-            painter.add(egui::epaint::Shape::line_segment(
-                [start_top, start_bottom],
-                Stroke::new(1.0, stroke_color),
-            ));
+            // Remove stroke lines - using filled shapes instead
         }
 
         if (right_bottom - right_top).abs() > 1.0 {
-            painter.add(egui::epaint::Shape::line_segment(
-                [end_top, end_bottom],
-                Stroke::new(1.0, stroke_color),
-            ));
+            // Remove stroke lines - using filled shapes instead
         }
     }
 
@@ -218,8 +202,8 @@ impl ConnectorRenderer {
                     left_point,
                     right_point,
                     &config,
-                    Color32::from_rgb(244, 67, 54), // Red for deletions
-                    end - start > 0,                // Multi-line
+                    Color32::from_rgb(33, 150, 243), // Unified blue
+                    end - start > 0,                 // Multi-line
                 );
             }
         }
@@ -239,8 +223,8 @@ impl ConnectorRenderer {
                     left_point,
                     right_point,
                     &config,
-                    Color32::from_rgb(76, 175, 80), // Green for additions
-                    end - start > 0,                // Multi-line
+                    Color32::from_rgb(33, 150, 243), // Unified blue
+                    end - start > 0,                 // Multi-line
                 );
             }
         }
@@ -273,8 +257,8 @@ impl ConnectorRenderer {
             egui::epaint::CubicBezierShape {
                 points: [curve.start, curve.control1, curve.control2, curve.end],
                 closed: false,
-                fill: Color32::TRANSPARENT,
-                stroke: Stroke::new(thickness, color.gamma_multiply(0.7)).into(),
+                fill: color,
+                stroke: egui::epaint::PathStroke::NONE,
             },
         ));
     }

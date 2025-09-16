@@ -78,7 +78,7 @@ impl LineRenderer {
             ui.painter().rect_stroke(
                 rect,
                 0.0,
-                Stroke::new(1.0, Color32::from_rgb(100, 150, 255)),
+                Stroke::new(1.0, Color32::from_rgb(33, 150, 243)),
                 egui::StrokeKind::Middle,
             );
         }
@@ -234,10 +234,15 @@ impl HighlightRenderer {
     }
 
     // Step 2 — Draw highlights
-    pub fn draw_highlight(&self, ui: &mut egui::Ui, rect: Rect) {
-        // Fill highlight with semi-transparent green - no borders
-        ui.painter()
-            .rect_filled(rect, 0.0, Color32::from_rgba_premultiplied(73, 156, 84, 25));
+    pub fn draw_highlight(
+        &self,
+        ui: &mut egui::Ui,
+        rect: Rect,
+        _line_type: &crate::models::line::LineType,
+    ) {
+        // Unified blue color for all highlights
+        let highlight_color = Color32::from_rgba_premultiplied(33, 150, 243, 64);
+        ui.painter().rect_filled(rect, 0.0, highlight_color);
     }
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {
@@ -305,13 +310,9 @@ impl ConnectorRenderer {
         self.draw_connector(x1, y1_start, y1_end, x2, y2_start, y2_end, color, ui);
     }
 
-    fn get_connector_color(&self, block: &ChangeBlock) -> Color32 {
-        match block.line_type {
-            LineType::Addition => Color32::from_rgba_unmultiplied(76, 175, 80, 120), // Green with opacity
-            LineType::Deletion => Color32::from_rgba_unmultiplied(244, 67, 54, 120), // Red with opacity
-            LineType::Context => Color32::from_rgba_unmultiplied(255, 193, 7, 120), // Yellow with opacity
-            LineType::Empty => Color32::from_rgba_unmultiplied(100, 150, 200, 120), // Blue with opacity
-        }
+    fn get_connector_color(&self, _block: &ChangeBlock) -> Color32 {
+        // Unified blue color for all blocks and connectors - match highlight color exactly
+        Color32::from_rgba_premultiplied(33, 150, 243, 64)
     }
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {
@@ -482,18 +483,20 @@ impl JetBrainsRenderer {
         });
 
         // Second pass: render highlights on top of text
-        for (i, _line) in left_lines.iter().enumerate() {
+        for (i, line) in left_lines.iter().enumerate() {
             if let Some(rect) = left_rects.get(i) {
                 if self.should_highlight_line(i, change_blocks) {
-                    self.highlight_renderer.draw_highlight(ui, *rect);
+                    self.highlight_renderer
+                        .draw_highlight(ui, *rect, &line.line_type);
                 }
             }
         }
 
-        for (i, _line) in right_lines.iter().enumerate() {
+        for (i, line) in right_lines.iter().enumerate() {
             if let Some(rect) = right_rects.get(i) {
                 if self.should_highlight_line(i, change_blocks) {
-                    self.highlight_renderer.draw_highlight(ui, *rect);
+                    self.highlight_renderer
+                        .draw_highlight(ui, *rect, &line.line_type);
                 }
             }
         }
