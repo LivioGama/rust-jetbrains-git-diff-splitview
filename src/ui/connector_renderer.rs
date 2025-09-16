@@ -1,7 +1,8 @@
 // Connector rendering logic for diff viewer
+use egui::epaint::StrokeKind;
 use egui::{Color32, Pos2, Rect, Stroke};
 
-use crate::models::types::{ChangeBlock, ConnectorCurve, LineType};
+use crate::models::types::LineType;
 use crate::theme::JetBrainsTheme;
 
 pub struct ConnectorRenderer {
@@ -157,7 +158,8 @@ impl ConnectorRenderer {
                                     stroke: Stroke::new(
                                         curve.thickness,
                                         curve.color.gamma_multiply(0.8),
-                                    ),
+                                    )
+                                    .into(),
                                 },
                             ));
                         }
@@ -217,6 +219,7 @@ impl ConnectorRenderer {
                 block_rect,
                 0.0, // No corner radius
                 Stroke::new(curve.thickness * 1.5, curve.color.gamma_multiply(0.9)),
+                StrokeKind::Middle,
             ));
         }
     }
@@ -278,7 +281,7 @@ impl ConnectorRenderer {
                 points: [start_top, control1_top, control2_top, end_top],
                 closed: false,
                 fill: Color32::TRANSPARENT,
-                stroke: Stroke::new(2.0, stroke_color),
+                stroke: Stroke::new(2.0, stroke_color).into(),
             },
         ));
 
@@ -291,7 +294,7 @@ impl ConnectorRenderer {
                 points: [start_bottom, control1_bottom, control2_bottom, end_bottom],
                 closed: false,
                 fill: Color32::TRANSPARENT,
-                stroke: Stroke::new(2.0, stroke_color),
+                stroke: Stroke::new(2.0, stroke_color).into(),
             },
         ));
 

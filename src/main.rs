@@ -4,8 +4,11 @@ use eframe::egui;
 
 // Module declarations
 mod app;
+mod config;
 mod diff;
+mod file_ops;
 mod models;
+mod navigation;
 mod sync;
 mod theme;
 mod ui;
@@ -13,6 +16,7 @@ mod ui;
 // Re-exports for convenience
 use app::*;
 use diff::*;
+use file_ops::*;
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
@@ -22,26 +26,20 @@ fn main() -> Result<(), eframe::Error> {
         ..Default::default()
     };
 
-    // Read complete files and apply diff highlighting
-    let original_content = std::process::Command::new("sh")
-        .arg("-c")
-        .arg("cd /Users/livio/Documents/anbiti-apps && git show HEAD:apps/reflecta/app/api/completion/route.ts")
-        .output()
-        .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
-        .unwrap_or_else(|_| "Error reading original TypeScript file".to_string());
+    // Read complete files and apply diff highlighting using file_ops
+    let file_ops = FileOps::with_default_config();
+    let file_content = file_ops.read_all_content().unwrap_or_else(|e| {
+        eprintln!("Error reading files: {}", e);
+        FileContent {
+            original_content: "Error reading original file".to_string(),
+            current_content: "Error reading current file".to_string(),
+            diff_text: "".to_string(),
+        }
+    });
 
-    let current_content = std::fs::read_to_string(
-        "/Users/livio/Documents/anbiti-apps/apps/reflecta/app/api/completion/route.ts",
-    )
-    .unwrap_or_else(|_| "Error reading current TypeScript file".to_string());
-
-    // Get git diff to identify changes
-    let diff_text = std::process::Command::new("sh")
-        .arg("-c")
-        .arg("cd /Users/livio/Documents/anbiti-apps && git diff HEAD -- apps/reflecta/app/api/completion/route.ts")
-        .output()
-        .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
-        .unwrap_or_else(|_| "".to_string());
+    let original_content = file_content.original_content;
+    let current_content = file_content.current_content;
+    let diff_text = file_content.diff_text;
 
     // Create complete side-by-side display with diff highlighting
     let (old_lines, new_lines, change_blocks) =
@@ -57,13 +55,13 @@ fn main() -> Result<(), eframe::Error> {
         "JetBrains Diff Viewer - Modular",
         options,
         Box::new(|_cc| {
-            Box::new(DiffViewerApp::new(
+            Ok(Box::new(DiffViewerApp::new(
                 old_lines,
                 new_lines,
                 change_blocks,
                 anchors,
                 mapping_segments,
-            ))
+            )))
         }),
     )
 }

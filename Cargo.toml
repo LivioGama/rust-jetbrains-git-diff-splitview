@@ -9,8 +9,11 @@ name = "diffsplit"
 path = "src/main.rs"
 
 [dependencies]
-eframe = "0.27"
-egui = "0.27"
+eframe = "0.32.3"
+egui = "0.32.3"
 git2 = "0.18"
 diff = "0.1"
 anyhow = "1.0"
+winit = "0.30.12"
+icrate = "0.1"
+objc2 = "0.5"

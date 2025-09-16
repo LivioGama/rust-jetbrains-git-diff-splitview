@@ -1,5 +1,5 @@
 // Scroll synchronization for diff viewer panes
-use crate::models::types::{AnchorPoint, ChangeBlock, LineType, MappingSegment};
+use crate::models::types::{AnchorPoint, ChangeBlock, MappingSegment};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MasterPane {
