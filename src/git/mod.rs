@@ -1,7 +1,6 @@
 // diffsplit/src/git/mod.rs
 // Git operations module
 
-use std::path::Path;
 use std::process::Command;
 
 /// Git operation result
@@ -9,8 +8,6 @@ use std::process::Command;
 pub struct GitResult {
     pub success: bool,
     pub stdout: String,
-    pub stderr: String,
-    pub exit_code: Option<i32>,
 }
 
 /// Git repository operations
@@ -38,14 +35,10 @@ impl GitOps {
             Ok(output) => GitResult {
                 success: output.status.success(),
                 stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                exit_code: output.status.code(),
             },
             Err(e) => GitResult {
                 success: false,
                 stdout: String::new(),
-                stderr: format!("Failed to execute git command: {}", e),
-                exit_code: None,
             },
         }
     }
@@ -76,65 +69,6 @@ impl GitOps {
         args.push(file_path);
 
         self.execute_command(&args)
-    }
-
-    /// Get the current HEAD commit
-    pub fn get_head_commit(&self) -> GitResult {
-        self.execute_command(&["rev-parse", "HEAD"])
-    }
-
-    /// Check if the repository is clean (no uncommitted changes)
-    pub fn is_clean(&self) -> GitResult {
-        self.execute_command(&["status", "--porcelain"])
-    }
-
-    /// Get the status of a specific file
-    pub fn file_status(&self, file_path: &str) -> GitResult {
-        self.execute_command(&["status", "--porcelain", file_path])
-    }
-
-    /// Stage a file
-    pub fn stage_file(&self, file_path: &str) -> GitResult {
-        self.execute_command(&["add", file_path])
-    }
-
-    /// Unstage a file
-    pub fn unstage_file(&self, file_path: &str) -> GitResult {
-        self.execute_command(&["reset", "HEAD", file_path])
-    }
-
-    /// Apply a hunk (placeholder - would need more complex implementation)
-    pub fn apply_hunk(&self, hunk_content: &str) -> GitResult {
-        // This would need to create a patch and apply it
-        // For now, just return an error
-        GitResult {
-            success: false,
-            stdout: String::new(),
-            stderr: "Hunk application not implemented".to_string(),
-            exit_code: Some(1),
-        }
-    }
-
-    /// Get repository information
-    pub fn get_repo_info(&self) -> GitResult {
-        self.execute_command(&["remote", "-v"])
-    }
-
-    /// Check if a file exists in the repository
-    pub fn file_exists(&self, file_path: &str) -> bool {
-        Path::new(&self.repo_path).join(file_path).exists()
-    }
-
-    /// Get the relative path from repo root
-    pub fn get_relative_path(&self, absolute_path: &str) -> Option<String> {
-        let repo_path = Path::new(&self.repo_path);
-        let abs_path = Path::new(absolute_path);
-
-        abs_path
-            .strip_prefix(repo_path)
-            .ok()
-            .and_then(|p| p.to_str())
-            .map(|s| s.to_string())
     }
 }
 

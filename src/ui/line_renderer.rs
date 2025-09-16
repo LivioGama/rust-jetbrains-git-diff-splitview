@@ -40,12 +40,16 @@ impl LineRenderer {
         // Ensure identical baseline positioning for both panes
         let baseline_y = rect.min.y + line_height - 3.0;
 
+        // Always fill the entire line background first to prevent white background
+        ui.painter().rect_filled(rect, 0.0, self.theme.background);
+
         // JetBrains-style background colors for diff highlighting using theme
         let bg_color = self.theme.get_line_background(&line.line_type);
 
-        // First draw JetBrains-style highlight if this is a changed line
+        // Draw JetBrains-style highlight for changed lines
         if line.line_type != LineType::Context {
-            self.highlight_renderer.draw_highlight(ui, rect);
+            self.highlight_renderer
+                .draw_highlight(ui, rect, &line.line_type);
         } else if bg_color != Color32::TRANSPARENT {
             // Fill background for the entire line for context changes
             ui.painter().rect_filled(rect, 0.0, bg_color);
@@ -94,7 +98,7 @@ impl LineRenderer {
         // Render code content with enhanced syntax highlighting and word-level diffs
         if !line.content.is_empty() {
             let content_start_x = self.theme.gutter_width;
-            let text_color = self.get_text_color(&line.content, &line.line_type);
+            let text_color = self.get_text_color(&line.content);
 
             // Override text color for highlighted lines to ensure readability
             let final_text_color = match line.line_type {
@@ -132,12 +136,13 @@ impl LineRenderer {
                         );
 
                         // Word-level highlight with improved JetBrains colors
-                        let highlight_color = match line.line_type {
-                            LineType::Context => {
-                                Color32::from_rgba_unmultiplied(187, 222, 251, 120)
-                            } // Blue for modifications
-                            _ => Color32::from_rgba_unmultiplied(255, 193, 7, 100), // Yellow for conflicts
-                        };
+                        // Use theme-based color for all word highlights
+                        let highlight_color = Color32::from_rgba_unmultiplied(
+                            self.theme.color_blue_500.r(),
+                            self.theme.color_blue_500.g(),
+                            self.theme.color_blue_500.b(),
+                            64,
+                        );
 
                         ui.painter()
                             .rect_filled(highlight_rect, 0.0, highlight_color);
@@ -149,7 +154,7 @@ impl LineRenderer {
         rect
     }
 
-    fn get_text_color(&self, content: &str, line_type: &LineType) -> Color32 {
+    fn get_text_color(&self, content: &str) -> Color32 {
         // Enhanced syntax highlighting with improved color detection
         let trimmed = content.trim();
 

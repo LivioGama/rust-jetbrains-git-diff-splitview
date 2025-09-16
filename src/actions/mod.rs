@@ -1,7 +1,6 @@
 // diffsplit/src/actions/mod.rs
 // User actions module for handling application commands
 
-use crate::git::GitOps;
 use crate::navigation::NavigationAction;
 
 /// Action result
@@ -9,17 +8,14 @@ use crate::navigation::NavigationAction;
 pub struct ActionResult {
     pub success: bool,
     pub message: String,
-    pub details: Option<String>,
 }
 
 /// Action handler for processing user commands
-pub struct ActionHandler {
-    git_ops: GitOps,
-}
+pub struct ActionHandler {}
 
 impl ActionHandler {
-    pub fn new(git_ops: GitOps) -> Self {
-        Self { git_ops }
+    pub fn new() -> Self {
+        Self {}
     }
 
     /// Execute an action based on the navigation action
@@ -31,7 +27,6 @@ impl ActionHandler {
             _ => ActionResult {
                 success: true,
                 message: "No action required".to_string(),
-                details: None,
             },
         }
     }
@@ -42,17 +37,15 @@ impl ActionHandler {
         ActionResult {
             success: false,
             message: format!("Hunk application not implemented for block {}", block_index),
-            details: Some("This feature requires integration with git apply".to_string()),
         }
     }
 
     /// Revert a hunk at the specified block index
     fn revert_hunk(&self, block_index: usize) -> ActionResult {
-        // TODO: Implement hunk reversion logic
+        // TODO: Implement hunk revert logic
         ActionResult {
             success: false,
-            message: format!("Hunk reversion not implemented for block {}", block_index),
-            details: Some("This feature requires integration with git apply -R".to_string()),
+            message: format!("Hunk revert not implemented for block {}", block_index),
         }
     }
 
@@ -62,53 +55,6 @@ impl ActionHandler {
         ActionResult {
             success: false,
             message: format!("Hunk staging not implemented for block {}", block_index),
-            details: Some("This feature requires integration with git add -p".to_string()),
-        }
-    }
-
-    /// Get the status of the current file
-    pub fn get_file_status(&self, file_path: &str) -> ActionResult {
-        let result = self.git_ops.file_status(file_path);
-
-        ActionResult {
-            success: result.success,
-            message: if result.success {
-                if result.stdout.is_empty() {
-                    "File is clean".to_string()
-                } else {
-                    format!("File status: {}", result.stdout.trim())
-                }
-            } else {
-                format!("Failed to get file status: {}", result.stderr)
-            },
-            details: if result.success && !result.stdout.is_empty() {
-                Some(result.stdout)
-            } else {
-                None
-            },
-        }
-    }
-
-    /// Check if the repository is clean
-    pub fn check_repo_clean(&self) -> ActionResult {
-        let result = self.git_ops.is_clean();
-
-        ActionResult {
-            success: result.success,
-            message: if result.success {
-                if result.stdout.is_empty() {
-                    "Repository is clean".to_string()
-                } else {
-                    "Repository has uncommitted changes".to_string()
-                }
-            } else {
-                format!("Failed to check repository status: {}", result.stderr)
-            },
-            details: if result.success && !result.stdout.is_empty() {
-                Some(result.stdout)
-            } else {
-                None
-            },
         }
     }
 }
@@ -118,7 +64,6 @@ impl Default for ActionResult {
         Self {
             success: false,
             message: "No action performed".to_string(),
-            details: None,
         }
     }
 }

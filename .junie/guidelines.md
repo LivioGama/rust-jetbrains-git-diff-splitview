@@ -1,8 +1,3 @@
----
-description:
-globs:
-alwaysApply: true
----
 Very important!
 
 Try to not give up so easily and giving me instructions.Take initiatives and do the next sections until you succeed.
@@ -24,3 +19,13 @@ Never do something different from what I ask, for example, removing a feature fo
 Never run `cargo run`, run `cargo check` instead. I always watch files.
 
 Try to keep your files short (under 250 lines), and the architecture modular.
+
+# NPM TS JS
+
+Also in general, if a port you need is blocked, don't hesitate to kill it with `kill $(lsof -t -i:PORT_NUMBER)`.
+
+Never run `bun run dev` or `bun run build` on NextJS, use `tsc` to detect typescript errors.
+
+When running `bun run dev` or finishing a task where the project is already running, always open the localhost project url in the browser. If you have your own as a plugin, prefer it.
+
+At the end of each task, pass lint fix. Then check all typescript errors by building and fix them. And then a final lint fix

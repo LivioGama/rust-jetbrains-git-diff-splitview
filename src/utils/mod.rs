@@ -1,8 +1,8 @@
 // diffsplit/src/utils/mod.rs
 // Common utilities module
 
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 /// String utilities
 pub mod string_utils {
@@ -127,7 +127,10 @@ pub mod geometry_utils {
 
         if length > 0.0 {
             let normalized = Pos2::new(perpendicular.x / length, perpendicular.y / length);
-            Pos2::new(center.x + normalized.x * height, center.y + normalized.y * height)
+            Pos2::new(
+                center.x + normalized.x * height,
+                center.y + normalized.y * height,
+            )
         } else {
             center
         }
@@ -135,8 +138,10 @@ pub mod geometry_utils {
 
     /// Check if a point is inside a rectangle
     pub fn point_in_rect(point: Pos2, rect_min: Pos2, rect_max: Pos2) -> bool {
-        point.x >= rect_min.x && point.x <= rect_max.x &&
-        point.y >= rect_min.y && point.y <= rect_max.y
+        point.x >= rect_min.x
+            && point.x <= rect_max.x
+            && point.y >= rect_min.y
+            && point.y <= rect_max.y
     }
 }
 
@@ -242,7 +247,10 @@ mod tests {
     #[test]
     fn test_string_truncate() {
         assert_eq!(string_utils::truncate_with_ellipsis("hello", 10), "hello");
-        assert_eq!(string_utils::truncate_with_ellipsis("hello world", 8), "hello...");
+        assert_eq!(
+            string_utils::truncate_with_ellipsis("hello world", 8),
+            "hello..."
+        );
     }
 
     #[test]

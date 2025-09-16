@@ -1,11 +1,14 @@
-// diffsplit/src/main.rs
-// Modular JetBrains Git Diff Viewer
+// jetbrains_diff_step_by_step2/src/main.rs
+// Main entry point for the JetBrains Diff Viewer
+// Clean, modular architecture with separated concerns
+
 use eframe::egui;
 
 // Module declarations
 mod actions;
 mod app;
 mod config;
+mod core;
 mod diff;
 mod file_ops;
 mod git;
@@ -21,96 +24,152 @@ mod utils;
 // Re-exports for convenience
 use actions::*;
 use app::*;
-use config::*;
 use diff::*;
-use file_ops::*;
+use file_ops::FileOps;
 use git::{GitOps, GitResult};
-use models::*;
-use navigation::*;
-use rendering::*;
 use state::*;
-use sync::*;
-use theme::*;
-use ui::*;
-use utils::*;
 
 fn main() -> Result<(), eframe::Error> {
+    println!("🚀 Starting JetBrains Diff Viewer - Modular Edition");
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1600.0, 1000.0])
-            .with_resizable(true),
+            .with_resizable(true)
+            .with_visible(true)
+            .with_transparent(false)
+            .with_decorations(true)
+            .with_window_level(egui::WindowLevel::Normal),
+        centered: true,
         ..Default::default()
     };
 
-    // Initialize Git operations and file operations
-    let git_ops = GitOps::with_current_dir();
+    println!("📊 Initializing Git operations and file operations...");
+    let git_ops = GitOps::new("/Users/livio/Documents/anbiti-apps/".to_string());
     let file_ops = FileOps::with_default_config();
+    println!("✅ Git operations initialized successfully");
 
-    // Read original file content from Git
-    let original_content =
-        match git_ops.show_file("HEAD", "apps/reflecta/app/api/completion/route.ts") {
-            GitResult {
-                success: true,
-                stdout,
-                ..
-            } => stdout,
-            _ => {
-                eprintln!("Warning: Could not read original file from Git, using fallback");
-                file_ops
-                    .read_original_content()
-                    .unwrap_or_else(|_| "Error reading original file".to_string())
+    // Try to read original file content from Git, with fallback
+    println!("📖 Reading original file content from Git...");
+    let original_content = match git_ops.show_file("cb2752b3", "apps/app/app/Providers.tsx") {
+        GitResult {
+            success: true,
+            stdout,
+            ..
+        } => {
+            println!("✅ Got original content ({} chars)", stdout.len());
+            stdout
+        }
+        _ => {
+            println!("❌ Failed to read original, trying fallback...");
+            match file_ops.read_original_content() {
+                Ok(content) => {
+                    println!("✅ Using fallback content ({} chars)", content.len());
+                    content
+                }
+                Err(e) => {
+                    println!("❌ Fallback also failed ({}), using default content", e);
+                    "function App() {\n  return <div>Hello World</div>;\n}\n\nexport default App;\n"
+                        .to_string()
+                }
             }
-        };
+        }
+    };
 
-    // Read current file content
-    let current_content = file_ops
-        .read_current_content()
-        .unwrap_or_else(|_| "Error reading current file".to_string());
+    // Try to read current file content, with fallback
+    println!("📖 Reading current file content...");
+    let current_content = match std::fs::read_to_string(
+        "/Users/livio/Documents/anbiti-apps/apps/app/app/Providers.tsx",
+    ) {
+        Ok(content) => {
+            println!("✅ Read current content ({} chars)", content.len());
+            content
+        }
+        Err(e) => {
+            println!("❌ Failed to read current file ({}), using fallback", e);
+            match file_ops.read_current_content() {
+                Ok(content) => {
+                    println!("✅ Using fallback content ({} chars)", content.len());
+                    content
+                }
+                Err(e2) => {
+                    println!("❌ Fallback also failed ({}), using default", e2);
+                    "function App() {\n  return <div>Hello World</div>;\n}\n\nexport default App;\n"
+                        .to_string()
+                }
+            }
+        }
+    };
 
-    // Get Git diff
+    // Try to get diff from Git, with fallback
+    println!("📖 Reading diff content...");
     let diff_text = match git_ops.diff_file(
-        None,
+        Some("cb2752b3"),
         Some("HEAD"),
-        "apps/reflecta/app/api/completion/route.ts",
+        "apps/app/app/Providers.tsx",
     ) {
         GitResult {
             success: true,
             stdout,
             ..
-        } => stdout,
+        } => {
+            println!("✅ Got diff content ({} chars)", stdout.len());
+            stdout
+        }
         _ => {
-            eprintln!("Warning: Could not get Git diff, using fallback");
-            file_ops.get_git_diff().unwrap_or_else(|_| "".to_string())
+            println!("❌ Failed to read diff, using default");
+            "diff --git a/apps/app/app/Providers.tsx b/apps/app/app/Providers.tsx\nindex cb2752b..dcc2893b 100644\n--- a/apps/app/app/Providers.tsx\n+++ b/apps/app/app/Providers.tsx\n@@ -1,5 +1,6 @@\n import React from 'react';\n import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';\n import { ThemeProvider } from './theme';\n import { AuthProvider } from './auth';\n+import { NotificationProvider } from './notifications';\n\n function AppProviders({ children }) {\n   return (\n@@ -7,6 +8,9 @@\n       <AuthProvider>\n+        <NotificationProvider>\n           <Router>\n             {children}\n+          </Router>\n+        </NotificationProvider>\n       </AuthProvider>\n     </ThemeProvider>\n   );\n }\n"
+                .to_string()
         }
     };
 
     // Create complete side-by-side display with diff highlighting
+    println!("⚙️ Processing diff...");
     let (old_lines, new_lines, change_blocks) =
         create_complete_side_by_side_with_diff(&original_content, &current_content, &diff_text);
+
+    println!(
+        "✅ Diff processed - old_lines: {}, new_lines: {}, change_blocks: {}",
+        old_lines.len(),
+        new_lines.len(),
+        change_blocks.len()
+    );
 
     // Build enhanced data structures for better functionality
     let line_height = 18.0;
     let anchors = sync::build_anchors_from_blocks(&change_blocks, line_height);
     let mapping_segments = sync::build_mapping_segments(&anchors);
 
+    // Git operations already initialized above
+
     // Initialize state manager and action handler
     let mut state_manager = StateManager::new();
-    let action_handler = ActionHandler::new(git_ops);
+    let action_handler = ActionHandler::new();
 
     // Initialize the application state
     state_manager.update_state(|state| {
-        state.current_file = "apps/reflecta/app/api/completion/route.ts".to_string();
-        state.left_lines = old_lines;
-        state.right_lines = new_lines;
+        state.current_file = "apps/app/app/Providers.tsx".to_string();
+        state.left_lines = old_lines.clone();
+        state.right_lines = new_lines.clone();
         state.change_blocks = change_blocks;
         state.anchors = anchors;
         state.mapping_segments = mapping_segments;
     });
 
     // Run the application
+    println!(
+        "🎨 About to create window with {} old lines and {} new lines",
+        old_lines.len(),
+        new_lines.len()
+    );
+    println!("✅ Application initialization complete, creating window...");
+
     eframe::run_native(
         "JetBrains Diff Viewer - Modular",
         options,
-        Box::new(move |_cc| Ok(Box::new(DiffViewerApp::new(state_manager, action_handler)))),
+        Box::new(move |_cc| {
+            println!("✅ Window creation callback called successfully");
+            Ok(Box::new(DiffViewerApp::new(state_manager, action_handler)))
+        }),
     )
 }

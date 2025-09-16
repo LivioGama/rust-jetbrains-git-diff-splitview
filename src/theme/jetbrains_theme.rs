@@ -68,7 +68,7 @@ impl JetBrainsTheme {
             font_family: "JetBrains Mono".to_string(),
             font_size: 13.0,
             line_height: 18.0,
-            gutter_width: 55.0,
+            gutter_width: 45.0,
             connector_width: 45.0,
             addition_background: Color32::from_rgba_unmultiplied(76, 175, 80, 64),
             addition_foreground: Color32::from_rgb(129, 199, 132),
@@ -76,9 +76,9 @@ impl JetBrainsTheme {
             deletion_background: Color32::from_rgba_unmultiplied(244, 67, 54, 64),
             deletion_foreground: Color32::from_rgb(239, 154, 154),
             deletion_gutter: Color32::from_rgb(244, 67, 54),
-            modification_background: Color32::from_rgba_unmultiplied(255, 193, 7, 64),
+            modification_background: Color32::from_rgba_unmultiplied(33, 150, 243, 64),
             modification_foreground: Color32::from_rgb(255, 249, 196),
-            modification_gutter: Color32::from_rgb(255, 193, 7),
+            modification_gutter: Color32::from_rgb(33, 150, 243),
             code_foreground: Color32::from_rgb(212, 212, 212),
             code_comment: Color32::from_rgb(106, 153, 85),
             code_keyword: Color32::from_rgb(86, 156, 214),
@@ -111,9 +111,9 @@ impl JetBrainsTheme {
 
     pub fn get_connector_color(&self, line_type: &crate::models::line::LineType) -> Color32 {
         match line_type {
-            crate::models::line::LineType::Addition => self.addition_gutter,
-            crate::models::line::LineType::Deletion => self.deletion_gutter,
-            _ => self.modification_gutter,
+            crate::models::line::LineType::Addition => self.addition_background,
+            crate::models::line::LineType::Deletion => self.deletion_background,
+            _ => self.modification_background,
         }
     }
 
