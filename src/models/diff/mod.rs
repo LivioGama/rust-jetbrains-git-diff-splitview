@@ -13,7 +13,11 @@ pub struct ChangeBlock {
 }
 
 impl ChangeBlock {
-    pub fn new(line_type: crate::models::line::LineType, start_line: usize, end_line: usize) -> Self {
+    pub fn new(
+        line_type: crate::models::line::LineType,
+        start_line: usize,
+        end_line: usize,
+    ) -> Self {
         Self {
             line_type,
             start_line,
@@ -72,12 +76,7 @@ pub struct MappingSegment {
 }
 
 impl MappingSegment {
-    pub fn new(
-        left_start: f32,
-        left_end: f32,
-        right_start: f32,
-        right_end: f32,
-    ) -> Self {
+    pub fn new(left_start: f32, left_end: f32, right_start: f32, right_end: f32) -> Self {
         let slope = if (left_end - left_start).abs() > f32::EPSILON {
             (right_end - right_start) / (left_end - left_start)
         } else {

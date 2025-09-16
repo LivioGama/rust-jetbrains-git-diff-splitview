@@ -1,5 +1,5 @@
 // Connector rendering logic for diff viewer
-use egui::epaint::StrokeKind;
+use egui::epaint::{PathShape, Shape};
 use egui::{Color32, Pos2, Rect, Stroke};
 
 use crate::models::line::LineType;
@@ -85,9 +85,6 @@ impl ConnectorRenderer {
                 block_rect, 2.0, // Slight corner radius for better aesthetics
                 fill_color,
             ));
-
-            // Draw subtle outline around the filled area for definition
-            // Remove stroke outline - using filled shape only
         }
     }
 
@@ -138,36 +135,43 @@ impl ConnectorRenderer {
         let control1_top = Pos2::new(start_top.x + control_distance, start_top.y);
         let control2_top = Pos2::new(end_top.x - control_distance, end_top.y);
 
-        painter.add(egui::epaint::Shape::CubicBezier(
-            egui::epaint::CubicBezierShape {
-                points: [start_top, control1_top, control2_top, end_top],
-                closed: false,
-                fill: stroke_color,
-                stroke: egui::epaint::PathStroke::NONE,
-            },
-        ));
-
         // Bottom curve
         let control1_bottom = Pos2::new(start_bottom.x + control_distance, start_bottom.y);
         let control2_bottom = Pos2::new(end_bottom.x - control_distance, end_bottom.y);
 
-        painter.add(egui::epaint::Shape::CubicBezier(
-            egui::epaint::CubicBezierShape {
-                points: [start_bottom, control1_bottom, control2_bottom, end_bottom],
-                closed: false,
-                fill: stroke_color,
-                stroke: egui::epaint::PathStroke::NONE,
-            },
-        ));
+        // Collect all points to create the filled polygon path
+        let mut path_points = Vec::new();
 
-        // Draw vertical connecting lines to create a band effect
-        if (left_bottom - left_top).abs() > 1.0 {
-            // Remove stroke lines - using filled shapes instead
+        // Add top curve points
+        for i in 0..=32 {
+            let t = i as f32 / 32.0;
+            path_points.push(self.evaluate_cubic_bezier(
+                start_top,
+                control1_top,
+                control2_top,
+                end_top,
+                t,
+            ));
         }
 
-        if (right_bottom - right_top).abs() > 1.0 {
-            // Remove stroke lines - using filled shapes instead
+        // Add bottom curve points (in reverse order to close the shape)
+        for i in (0..=32).rev() {
+            let t = i as f32 / 32.0;
+            path_points.push(self.evaluate_cubic_bezier(
+                start_bottom,
+                control1_bottom,
+                control2_bottom,
+                end_bottom,
+                t,
+            ));
         }
+
+        // Create and draw the filled shape without any stroke
+        let filled_shape =
+            Shape::convex_polygon(path_points, stroke_color, Stroke::new(0.0, stroke_color));
+        painter.add(filled_shape);
+
+        // Using filled curves only - no additional stroke lines needed
     }
 
     /// JetBrains-style connector rendering for independent line arrays
@@ -203,7 +207,7 @@ impl ConnectorRenderer {
                     right_point,
                     &config,
                     Color32::from_rgb(33, 150, 243), // Unified blue
-                    end - start > 0,                 // Multi-line
+                    end - start > 0,           // Multi-line
                 );
             }
         }
@@ -224,7 +228,7 @@ impl ConnectorRenderer {
                     right_point,
                     &config,
                     Color32::from_rgb(33, 150, 243), // Unified blue
-                    end - start > 0,                 // Multi-line
+                    end - start > 0,           // Multi-line
                 );
             }
         }
@@ -253,14 +257,29 @@ impl ConnectorRenderer {
             config.ribbon_width * 0.8
         };
 
-        painter.add(egui::epaint::Shape::CubicBezier(
-            egui::epaint::CubicBezierShape {
-                points: [curve.start, curve.control1, curve.control2, curve.end],
-                closed: false,
-                fill: color,
-                stroke: egui::epaint::PathStroke::NONE,
-            },
-        ));
+        // For single connector, create a simple curved line using convex polygon
+        let mut path_points = Vec::new();
+
+        // Generate curve points
+        for i in 0..=20 {
+            let t = i as f32 / 20.0;
+            path_points.push(self.evaluate_cubic_bezier(
+                curve.start,
+                curve.control1,
+                curve.control2,
+                curve.end,
+                t,
+            ));
+        }
+
+        // Create a complete connector by adding points slightly offset for thickness
+        let mut connector_points = path_points.clone();
+        for point in path_points.iter().rev() {
+            connector_points.push(Pos2::new(point.x, point.y + thickness));
+        }
+
+        let filled_shape = Shape::convex_polygon(connector_points, color, Stroke::new(0.0, color));
+        painter.add(filled_shape);
     }
 
     /// Find change blocks of a specific type in a line array
@@ -290,5 +309,18 @@ impl ConnectorRenderer {
         }
 
         blocks
+    }
+
+    fn evaluate_cubic_bezier(&self, p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, t: f32) -> Pos2 {
+        let u = 1.0 - t;
+        let tt = t * t;
+        let uu = u * u;
+        let uuu = uu * u;
+        let ttt = tt * t;
+
+        Pos2::new(
+            uuu * p0.x + 3.0 * uu * t * p1.x + 3.0 * u * tt * p2.x + ttt * p3.x,
+            uuu * p0.y + 3.0 * uu * t * p1.y + 3.0 * u * tt * p2.y + ttt * p3.y,
+        )
     }
 }

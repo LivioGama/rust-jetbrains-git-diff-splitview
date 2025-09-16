@@ -59,9 +59,18 @@ pub struct ThemeConfig {
 impl Default for ThemeConfig {
     fn default() -> Self {
         let mut custom_colors = HashMap::new();
-        custom_colors.insert("background".to_string(), egui::Color32::from_rgb(43, 43, 43));
-        custom_colors.insert("foreground".to_string(), egui::Color32::from_rgb(255, 255, 255));
-        custom_colors.insert("connector_column".to_string(), egui::Color32::from_rgb(60, 60, 60));
+        custom_colors.insert(
+            "background".to_string(),
+            egui::Color32::from_rgb(43, 43, 43),
+        );
+        custom_colors.insert(
+            "foreground".to_string(),
+            egui::Color32::from_rgb(255, 255, 255),
+        );
+        custom_colors.insert(
+            "connector_column".to_string(),
+            egui::Color32::from_rgb(60, 60, 60),
+        );
 
         Self {
             dark_mode: true,

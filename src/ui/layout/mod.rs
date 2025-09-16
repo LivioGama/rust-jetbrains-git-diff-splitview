@@ -173,7 +173,7 @@ impl LayoutManager {
                     right_rects.get(right_start),
                     right_rects.get(right_end),
                 ) {
-                    // Use actual rendered positions
+                    // Use actual rendered positions - align with line rectangles
                     let left_y_start = left_start_rect.top();
                     let left_y_end = left_end_rect.bottom();
                     let right_y_start = right_start_rect.top();
@@ -183,8 +183,8 @@ impl LayoutManager {
                     let x1 = gutter_x_start - 1.0; // Extend into left pane
                     let x2 = gutter_x_end + 1.0; // Extend into right pane
 
-                    // Use unified blue color for hunk connectors
-                    let color = egui::Color32::from_rgba_premultiplied(33, 150, 243, 64);
+                    // Use theme addition color (green with transparency)
+                    let color = egui::Color32::from_rgba_unmultiplied(76, 175, 80, 100);
 
                     // Draw the S-shaped connector linking the two hunks
                     self.draw_connector(
@@ -216,17 +216,17 @@ impl LayoutManager {
     ) {
         use egui::{epaint::PathShape, Pos2, Shape};
 
-        let cp1_x = x1 + (x2 - x1) * 0.35;
-        let cp2_x = x2 - (x2 - x1) * 0.35;
+        let cp1_x = x1 + (x2 - x1) * 0.4;
+        let cp2_x = x2 - (x2 - x1) * 0.4;
 
-        // Adjust control points for S-shape
+        // Adjust control points for better alignment with line blocks
         let y_diff_top = y2_start - y1_start;
-        let cp1_y = y1_start + y_diff_top * 0.2;
-        let cp2_y = y2_start - y_diff_top * 0.2;
+        let cp1_y = y1_start + y_diff_top * 0.15;
+        let cp2_y = y2_start - y_diff_top * 0.15;
 
         let y_diff_bottom = y2_end - y1_end;
-        let cp1_y_bottom = y1_end + y_diff_bottom * 0.2;
-        let cp2_y_bottom = y2_end - y_diff_bottom * 0.2;
+        let cp1_y_bottom = y1_end + y_diff_bottom * 0.15;
+        let cp2_y_bottom = y2_end - y_diff_bottom * 0.15;
 
         // Create the path by interpolating Bezier curves
         let mut points = Vec::new();
@@ -257,16 +257,45 @@ impl LayoutManager {
         // Close the path
         points.push(Pos2::new(x1, y1_start));
 
-        // Create the path shape with fill only (no stroke for seamless connection)
-        let path_shape = PathShape {
-            points,
-            closed: true,
-            fill: color,
-            stroke: egui::epaint::PathStroke::NONE,
+        // Use mesh approach to completely eliminate any border artifacts
+        let mut mesh = egui::epaint::Mesh::default();
+
+        // Make color slightly transparent for smooth blending
+        let fill_color = {
+            let [r, g, b, _a] = color.to_array();
+            egui::Color32::from_rgba_unmultiplied(r, g, b, 180)
         };
 
-        // Draw the connector
-        ui.painter().add(Shape::Path(path_shape));
+        // Create center point for triangulation
+        let center =
+            points.iter().fold(Pos2::ZERO, |acc, p| acc + p.to_vec2()) / points.len() as f32;
+
+        // Add center vertex
+        mesh.vertices.push(egui::epaint::Vertex {
+            pos: center,
+            uv: egui::epaint::WHITE_UV,
+            color: fill_color,
+        });
+
+        // Add edge vertices
+        for point in &points {
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: *point,
+                uv: egui::epaint::WHITE_UV,
+                color: fill_color,
+            });
+        }
+
+        // Create triangles from center to edges
+        for i in 0..points.len() {
+            let next_i = (i + 1) % points.len();
+            mesh.indices
+                .extend_from_slice(&[0, (i + 1) as u32, (next_i + 1) as u32]);
+        }
+
+        // Draw the mesh
+        ui.painter()
+            .add(egui::Shape::Mesh(std::sync::Arc::new(mesh)));
     }
 
     /// Generate points for a cubic Bezier curve
@@ -497,15 +526,15 @@ impl LayoutManager {
                                 right_rects.get(right_start),
                                 right_rects.get(right_end),
                             ) {
-                                // Use actual rendered positions
-                                let left_y_start = left_start_rect.top() + 2.0;
-                                let left_y_end = left_end_rect.bottom() - 2.0;
-                                let right_y_start = right_start_rect.top() + 2.0;
-                                let right_y_end = right_end_rect.bottom() - 2.0;
+                                // Use actual rendered positions - align with line rectangles
+                                let y1_start = left_start_rect.top();
+                                let y1_end = left_end_rect.bottom();
+                                let y2_start = right_start_rect.top();
+                                let y2_end = right_end_rect.bottom();
 
                                 // Only draw connector if at least part of it is visible in the gutter area
-                                let connector_top = left_y_start.min(right_y_start);
-                                let connector_bottom = left_y_end.max(right_y_end);
+                                let connector_top = y1_start.min(y2_start);
+                                let connector_bottom = y1_end.max(y2_end);
                                 let visible_area_top = full_rect.top() + header_height;
                                 let visible_area_bottom = full_rect.bottom();
 
@@ -517,20 +546,13 @@ impl LayoutManager {
                                     let x1 = full_rect.left() - 1.0; // Extend into left pane
                                     let x2 = full_rect.right() + 1.0; // Extend into right pane
 
-                                    // Use unified blue color for hunk connectors
+                                    // Use theme addition color (green with transparency)
                                     let color =
-                                        egui::Color32::from_rgba_premultiplied(33, 150, 243, 64);
+                                        egui::Color32::from_rgba_unmultiplied(76, 175, 80, 100);
 
                                     // Draw the S-shaped connector linking the two hunks
-                                    connector_renderer.draw_connector(
-                                        x1,
-                                        left_y_start,
-                                        left_y_end,
-                                        x2,
-                                        right_y_start,
-                                        right_y_end,
-                                        color,
-                                        ui,
+                                    self.draw_connector(
+                                        ui, x1, y1_start, y1_end, x2, y2_start, y2_end, color,
                                     );
                                 }
                             }
