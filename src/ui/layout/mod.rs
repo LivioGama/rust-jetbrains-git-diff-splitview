@@ -2,7 +2,7 @@
 // UI Layout module for organizing the main application interface
 
 use eframe::egui;
-use egui::{FontId, ScrollArea, Vec2};
+use egui::{FontId, Pos2, ScrollArea, Vec2};
 
 use crate::config::LayoutConfig;
 use crate::models::diff::MappingSegment;
@@ -40,11 +40,12 @@ impl LayoutManager {
         let total_width = ui.available_width();
         let pane_width = (total_width - self.config.connector_column_width) / 2.0;
 
-        // Create a horizontal layout with explicit height allocation
+        // Create a horizontal layout with explicit height allocation and no spacing
         ui.allocate_ui_with_layout(
             Vec2::new(total_width, total_height),
             egui::Layout::left_to_right(egui::Align::TOP),
             |ui| {
+                ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
                 // Left pane (original)
                 self.render_left_pane(
                     ui,
@@ -57,15 +58,15 @@ impl LayoutManager {
                     mapping_segments,
                 );
 
-                // Middle gutter for connections
-                self.render_connector_gutter(
-                    ui,
-                    old_lines,
-                    new_lines,
-                    connector_renderer,
-                    theme,
-                    total_height,
-                );
+                // Middle gutter background (connectors will be drawn later)
+                let gutter_rect = ui
+                    .allocate_response(
+                        egui::Vec2::new(self.config.connector_column_width, total_height),
+                        egui::Sense::hover(),
+                    )
+                    .rect;
+                ui.painter()
+                    .rect_filled(gutter_rect, 0.0, theme.connector_column);
 
                 // Right pane (modified)
                 self.render_right_pane(
@@ -80,6 +81,217 @@ impl LayoutManager {
                 );
             },
         );
+
+        // Now render connectors after both panes are rendered
+        self.render_connectors(ui, old_lines, new_lines, pane_width);
+    }
+
+    /// Render connectors between panes
+    fn render_connectors(
+        &self,
+        ui: &mut egui::Ui,
+        old_lines: &[DisplayLine],
+        new_lines: &[DisplayLine],
+        pane_width: f32,
+    ) {
+        // Get stored rectangle positions
+        let left_rects: Option<Vec<egui::Rect>> = ui
+            .ctx()
+            .memory_mut(|mem| mem.data.get_persisted("left_rects".into()));
+        let right_rects: Option<Vec<egui::Rect>> = ui
+            .ctx()
+            .memory_mut(|mem| mem.data.get_persisted("right_rects".into()));
+
+        if let (Some(left_rects), Some(right_rects)) = (left_rects, right_rects) {
+            // Calculate gutter position
+            let gutter_x_start = pane_width;
+            let gutter_x_end = gutter_x_start + self.config.connector_column_width;
+
+            // Find change hunks (contiguous blocks of any changes) on both sides
+            let mut left_hunks = Vec::new();
+            let mut current_left: Option<(usize, usize)> = None;
+
+            for (i, line) in old_lines.iter().enumerate() {
+                if line.line_type != crate::models::line::LineType::Context {
+                    match current_left.as_mut() {
+                        Some((_, ref mut end)) => {
+                            *end = i;
+                        }
+                        None => {
+                            current_left = Some((i, i));
+                        }
+                    }
+                } else if let Some(hunk) = current_left.take() {
+                    left_hunks.push(hunk);
+                }
+            }
+            if let Some(hunk) = current_left.take() {
+                left_hunks.push(hunk);
+            }
+
+            let mut right_hunks = Vec::new();
+            let mut current_right: Option<(usize, usize)> = None;
+
+            for (i, line) in new_lines.iter().enumerate() {
+                if line.line_type != crate::models::line::LineType::Context {
+                    match current_right.as_mut() {
+                        Some((_, ref mut end)) => {
+                            *end = i;
+                        }
+                        None => {
+                            current_right = Some((i, i));
+                        }
+                    }
+                } else if let Some(hunk) = current_right.take() {
+                    right_hunks.push(hunk);
+                }
+            }
+            if let Some(hunk) = current_right.take() {
+                right_hunks.push(hunk);
+            }
+
+            // Pair up corresponding hunks
+            let hunk_pairs = std::cmp::min(left_hunks.len(), right_hunks.len());
+            let mut connectors = Vec::new();
+
+            for i in 0..hunk_pairs {
+                let (left_start, left_end) = left_hunks[i];
+                let (right_start, right_end) = right_hunks[i];
+                connectors.push((left_start, left_end, right_start, right_end));
+            }
+
+            // Draw connectors for each hunk pair
+            for (left_start, left_end, right_start, right_end) in connectors {
+                if let (
+                    Some(left_start_rect),
+                    Some(left_end_rect),
+                    Some(right_start_rect),
+                    Some(right_end_rect),
+                ) = (
+                    left_rects.get(left_start),
+                    left_rects.get(left_end),
+                    right_rects.get(right_start),
+                    right_rects.get(right_end),
+                ) {
+                    // Use actual rendered positions
+                    let left_y_start = left_start_rect.top();
+                    let left_y_end = left_end_rect.bottom();
+                    let right_y_start = right_start_rect.top();
+                    let right_y_end = right_end_rect.bottom();
+
+                    // Connector coordinates - extend into panes for seamless connection
+                    let x1 = gutter_x_start - 1.0; // Extend into left pane
+                    let x2 = gutter_x_end + 1.0; // Extend into right pane
+
+                    // Use a neutral color for hunk connectors
+                    let color = egui::Color32::from_rgba_unmultiplied(100, 150, 200, 120);
+
+                    // Draw the S-shaped connector linking the two hunks
+                    self.draw_connector(
+                        ui,
+                        x1,
+                        left_y_start,
+                        left_y_end,
+                        x2,
+                        right_y_start,
+                        right_y_end,
+                        color,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Draw a single connector using the rendering connector
+    fn draw_connector(
+        &self,
+        ui: &mut egui::Ui,
+        x1: f32,
+        y1_start: f32,
+        y1_end: f32,
+        x2: f32,
+        y2_start: f32,
+        y2_end: f32,
+        color: egui::Color32,
+    ) {
+        use egui::{epaint::PathShape, Pos2, Shape};
+
+        let cp1_x = x1 + (x2 - x1) * 0.35;
+        let cp2_x = x2 - (x2 - x1) * 0.35;
+
+        // Adjust control points for S-shape
+        let y_diff_top = y2_start - y1_start;
+        let cp1_y = y1_start + y_diff_top * 0.2;
+        let cp2_y = y2_start - y_diff_top * 0.2;
+
+        let y_diff_bottom = y2_end - y1_end;
+        let cp1_y_bottom = y1_end + y_diff_bottom * 0.2;
+        let cp2_y_bottom = y2_end - y_diff_bottom * 0.2;
+
+        // Create the path by interpolating Bezier curves
+        let mut points = Vec::new();
+
+        // Top curve
+        let top_curve_points = self.cubic_bezier_points(
+            Pos2::new(x1, y1_start),
+            Pos2::new(cp1_x, cp1_y),
+            Pos2::new(cp2_x, cp2_y),
+            Pos2::new(x2, y2_start),
+            20,
+        );
+        points.extend(top_curve_points);
+
+        // Right side
+        points.push(Pos2::new(x2, y2_end));
+
+        // Bottom curve
+        let bottom_curve_points = self.cubic_bezier_points(
+            Pos2::new(x2, y2_end),
+            Pos2::new(cp2_x, cp2_y_bottom),
+            Pos2::new(cp1_x, cp1_y_bottom),
+            Pos2::new(x1, y1_end),
+            20,
+        );
+        points.extend(bottom_curve_points);
+
+        // Close the path
+        points.push(Pos2::new(x1, y1_start));
+
+        // Create the path shape with fill only (no stroke for seamless connection)
+        let path_shape = PathShape {
+            points,
+            closed: true,
+            fill: color,
+            stroke: egui::epaint::PathStroke::NONE,
+        };
+
+        // Draw the connector
+        ui.painter().add(Shape::Path(path_shape));
+    }
+
+    /// Generate points for a cubic Bezier curve
+    fn cubic_bezier_points(
+        &self,
+        p0: Pos2,
+        p1: Pos2,
+        p2: Pos2,
+        p3: Pos2,
+        segments: usize,
+    ) -> Vec<Pos2> {
+        let mut points = Vec::new();
+        for i in 0..=segments {
+            let t = i as f32 / segments as f32;
+            let x = (1.0 - t).powi(3) * p0.x
+                + 3.0 * (1.0 - t).powi(2) * t * p1.x
+                + 3.0 * (1.0 - t) * t.powi(2) * p2.x
+                + t.powi(3) * p3.x;
+            let y = (1.0 - t).powi(3) * p0.y
+                + 3.0 * (1.0 - t).powi(2) * t * p1.y
+                + 3.0 * (1.0 - t) * t.powi(2) * p2.y
+                + t.powi(3) * p3.y;
+            points.push(Pos2::new(x, y));
+        }
+        points
     }
 
     /// Render the left pane (original file)
@@ -98,6 +310,8 @@ impl LayoutManager {
             Vec2::new(pane_width, total_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
+                ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
+                ui.style_mut().spacing.indent = 0.0;
                 // Header
                 self.render_pane_header(ui, "Original", theme);
 
@@ -136,6 +350,8 @@ impl LayoutManager {
             Vec2::new(pane_width, total_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
+                ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
+                ui.style_mut().spacing.indent = 0.0;
                 // Header
                 self.render_pane_header(ui, "Modified", theme);
 
@@ -167,6 +383,8 @@ impl LayoutManager {
         connector_renderer: &mut crate::ui::ConnectorRenderer,
         theme: &crate::theme::JetBrainsTheme,
         total_height: f32,
+        pane_width: f32,
+        scroll_sync: &crate::sync::ScrollSync,
     ) {
         // Create a frame with proper background color
         let frame = egui::Frame::new()
@@ -191,8 +409,133 @@ impl LayoutManager {
                     ui.painter()
                         .rect_filled(full_rect, 0.0, theme.connector_column);
 
-                    // Draw connection lines
-                    connector_renderer.draw_connection_lines(ui, old_lines, new_lines);
+                    // Find change hunks (contiguous blocks of any changes) on both sides
+                    // This matches JetBrains behavior where connectors link corresponding hunks
+
+                    // Find change hunks on left side
+                    let mut left_hunks = Vec::new();
+                    let mut current_left: Option<(usize, usize)> = None;
+
+                    for (i, line) in old_lines.iter().enumerate() {
+                        if line.line_type != crate::models::line::LineType::Context {
+                            match current_left.as_mut() {
+                                Some((_, ref mut end)) => {
+                                    *end = i;
+                                }
+                                None => {
+                                    current_left = Some((i, i));
+                                }
+                            }
+                        } else if let Some(hunk) = current_left.take() {
+                            left_hunks.push(hunk);
+                        }
+                    }
+                    if let Some(hunk) = current_left.take() {
+                        left_hunks.push(hunk);
+                    }
+
+                    // Find change hunks on right side
+                    let mut right_hunks = Vec::new();
+                    let mut current_right: Option<(usize, usize)> = None;
+
+                    for (i, line) in new_lines.iter().enumerate() {
+                        if line.line_type != crate::models::line::LineType::Context {
+                            match current_right.as_mut() {
+                                Some((_, ref mut end)) => {
+                                    *end = i;
+                                }
+                                None => {
+                                    current_right = Some((i, i));
+                                }
+                            }
+                        } else if let Some(hunk) = current_right.take() {
+                            right_hunks.push(hunk);
+                        }
+                    }
+                    if let Some(hunk) = current_right.take() {
+                        right_hunks.push(hunk);
+                    }
+
+                    // Pair up corresponding hunks - this is the key to JetBrains behavior
+                    let hunk_pairs = std::cmp::min(left_hunks.len(), right_hunks.len());
+                    let mut connectors = Vec::new();
+
+                    for i in 0..hunk_pairs {
+                        let (left_start, left_end) = left_hunks[i];
+                        let (right_start, right_end) = right_hunks[i];
+                        connectors.push((left_start, left_end, right_start, right_end));
+                    }
+
+                    // Create connector renderer and draw connectors between paired hunks
+                    let connector_renderer =
+                        crate::rendering::ConnectorRenderer::new(theme.clone());
+                    let line_height = 18.0;
+                    // Account for header height (header + separator)
+                    let header_height = theme.font_size * 1.1 + 20.0;
+
+                    // Get actual rendered rectangle positions from memory
+                    let left_rects: Option<Vec<egui::Rect>> = ui
+                        .ctx()
+                        .memory_mut(|mem| mem.data.get_persisted("left_rects".into()));
+                    let right_rects: Option<Vec<egui::Rect>> = ui
+                        .ctx()
+                        .memory_mut(|mem| mem.data.get_persisted("right_rects".into()));
+
+                    // Only draw connectors if we have actual rendered positions
+                    if let (Some(left_rects), Some(right_rects)) = (left_rects, right_rects) {
+                        // Draw connectors for each hunk pair using actual rendered positions
+                        for (left_start, left_end, right_start, right_end) in connectors {
+                            // Get actual rendered positions from stored rectangles
+                            if let (
+                                Some(left_start_rect),
+                                Some(left_end_rect),
+                                Some(right_start_rect),
+                                Some(right_end_rect),
+                            ) = (
+                                left_rects.get(left_start),
+                                left_rects.get(left_end),
+                                right_rects.get(right_start),
+                                right_rects.get(right_end),
+                            ) {
+                                // Use actual rendered positions
+                                let left_y_start = left_start_rect.top() + 2.0;
+                                let left_y_end = left_end_rect.bottom() - 2.0;
+                                let right_y_start = right_start_rect.top() + 2.0;
+                                let right_y_end = right_end_rect.bottom() - 2.0;
+
+                                // Only draw connector if at least part of it is visible in the gutter area
+                                let connector_top = left_y_start.min(right_y_start);
+                                let connector_bottom = left_y_end.max(right_y_end);
+                                let visible_area_top = full_rect.top() + header_height;
+                                let visible_area_bottom = full_rect.bottom();
+
+                                // Check if connector overlaps with visible area
+                                if connector_bottom >= visible_area_top
+                                    && connector_top <= visible_area_bottom
+                                {
+                                    // Connector coordinates - extend into panes for seamless connection
+                                    let x1 = full_rect.left() - 1.0; // Extend into left pane
+                                    let x2 = full_rect.right() + 1.0; // Extend into right pane
+
+                                    // Use a neutral color for hunk connectors (like JetBrains)
+                                    let color =
+                                        egui::Color32::from_rgba_unmultiplied(100, 150, 200, 120);
+
+                                    // Draw the S-shaped connector linking the two hunks
+                                    connector_renderer.draw_connector(
+                                        x1,
+                                        left_y_start,
+                                        left_y_end,
+                                        x2,
+                                        right_y_start,
+                                        right_y_end,
+                                        color,
+                                        ui,
+                                    );
+                                }
+                            }
+                        }
+                    }
                 },
             );
         });

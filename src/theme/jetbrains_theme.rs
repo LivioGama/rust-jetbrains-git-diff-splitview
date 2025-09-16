@@ -68,7 +68,7 @@ impl JetBrainsTheme {
             font_family: "JetBrains Mono".to_string(),
             font_size: 13.0,
             line_height: 18.0,
-            gutter_width: 55.0,
+            gutter_width: 45.0,
             connector_width: 45.0,
             addition_background: Color32::from_rgba_unmultiplied(76, 175, 80, 64),
             addition_foreground: Color32::from_rgb(129, 199, 132),
