@@ -45,6 +45,7 @@ pub struct JetBrainsTheme {
     pub scrollbar_thumb: Color32,
     pub line_numbers: Color32,
     pub line_numbers_active: Color32,
+    pub show_line_numbers: bool,
 }
 
 impl JetBrainsTheme {
@@ -92,6 +93,7 @@ impl JetBrainsTheme {
             scrollbar_thumb: Color32::from_rgb(100, 100, 100),
             line_numbers: Color32::from_rgb(153, 153, 153),
             line_numbers_active: Color32::from_rgb(255, 255, 255),
+            show_line_numbers: true,
         }
     }
 
@@ -107,20 +109,20 @@ impl JetBrainsTheme {
         ctx.set_style(style);
     }
 
-    pub fn get_connector_color(&self, line_type: &crate::models::types::LineType) -> Color32 {
+    pub fn get_connector_color(&self, line_type: &crate::models::line::LineType) -> Color32 {
         match line_type {
-            crate::models::types::LineType::Addition => self.addition_gutter,
-            crate::models::types::LineType::Deletion => self.deletion_gutter,
+            crate::models::line::LineType::Addition => self.addition_gutter,
+            crate::models::line::LineType::Deletion => self.deletion_gutter,
             _ => self.modification_gutter,
         }
     }
 
-    pub fn get_line_background(&self, line_type: &crate::models::types::LineType) -> Color32 {
+    pub fn get_line_background(&self, line_type: &crate::models::line::LineType) -> Color32 {
         match line_type {
-            crate::models::types::LineType::Addition => self.addition_background,
-            crate::models::types::LineType::Deletion => self.deletion_background,
-            crate::models::types::LineType::Context => Color32::TRANSPARENT,
-            crate::models::types::LineType::Empty => Color32::TRANSPARENT,
+            crate::models::line::LineType::Addition => self.addition_background,
+            crate::models::line::LineType::Deletion => self.deletion_background,
+            crate::models::line::LineType::Context => Color32::TRANSPARENT,
+            crate::models::line::LineType::Empty => Color32::TRANSPARENT,
         }
     }
 }

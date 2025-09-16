@@ -2,22 +2,19 @@
 use eframe::egui;
 use egui::{Color32, Rect};
 
+use crate::actions::*;
 use crate::config::*;
 use crate::models::*;
 use crate::navigation::*;
+use crate::state::*;
 use crate::sync::*;
 use crate::theme::*;
 use crate::ui::layout::*;
 use crate::ui::*;
 
 pub struct DiffViewerApp {
-    pub old_lines: Vec<DisplayLine>,
-    pub new_lines: Vec<DisplayLine>,
-    pub change_blocks: Vec<ChangeBlock>,
-    pub anchors: Vec<AnchorPoint>,
-    pub mapping_segments: Vec<MappingSegment>,
-    pub connector_curves: Vec<ConnectorCurve>,
-    pub current_file: usize,
+    pub state_manager: StateManager,
+    pub action_handler: ActionHandler,
     pub scroll_sync: ScrollSync,
     pub theme: JetBrainsTheme,
     pub line_renderer: LineRenderer,
@@ -28,26 +25,15 @@ pub struct DiffViewerApp {
 }
 
 impl DiffViewerApp {
-    pub fn new(
-        old_lines: Vec<DisplayLine>,
-        new_lines: Vec<DisplayLine>,
-        change_blocks: Vec<ChangeBlock>,
-        anchors: Vec<AnchorPoint>,
-        mapping_segments: Vec<MappingSegment>,
-    ) -> Self {
+    pub fn new(state_manager: StateManager, action_handler: ActionHandler) -> Self {
         let theme = JetBrainsTheme::dark_theme();
         let line_height = 18.0;
         let viewport_height = 1000.0;
         let config_manager = ConfigManager::new();
 
         Self {
-            old_lines,
-            new_lines,
-            change_blocks,
-            anchors,
-            mapping_segments,
-            connector_curves: Vec::new(),
-            current_file: 0,
+            state_manager,
+            action_handler,
             scroll_sync: ScrollSync::new(line_height, viewport_height),
             theme: theme.clone(),
             line_renderer: LineRenderer::new(theme.clone()),
@@ -59,54 +45,22 @@ impl DiffViewerApp {
     }
 
     fn handle_navigation_action(&mut self, action: NavigationAction) {
-        match action {
-            NavigationAction::ApplyHunk => self.apply_current_hunk(),
-            NavigationAction::RevertHunk => self.revert_current_hunk(),
-            NavigationAction::StageHunk => self.stage_current_hunk(),
-            _ => {} // Other actions are handled by the navigation handler
+        let current_block = self
+            .state_manager
+            .get_current_state()
+            .navigation_state
+            .current_block_index;
+        let result = self.action_handler.execute_action(action, current_block);
+
+        // Log the result
+        match result.success {
+            true => println!("Action completed: {}", result.message),
+            false => eprintln!("Action failed: {}", result.message),
         }
-    }
 
-    fn apply_current_hunk(&mut self) {
-        // Implementation for applying current hunk
-        // TODO: Integrate with git operations
-        println!(
-            "Applying current hunk at block {}",
-            self.navigation_handler.current_block_index()
-        );
-    }
-
-    fn revert_current_hunk(&mut self) {
-        // Implementation for reverting current hunk
-        // TODO: Integrate with git operations
-        println!(
-            "Reverting current hunk at block {}",
-            self.navigation_handler.current_block_index()
-        );
-    }
-
-    fn stage_current_hunk(&mut self) {
-        // Implementation for staging current hunk
-        // TODO: Integrate with git operations
-        println!(
-            "Staging current hunk at block {}",
-            self.navigation_handler.current_block_index()
-        );
-    }
-
-    fn update_connector_curves(&mut self) {
-        // Implementation for updating connector curves
-        // TODO: Implement connector curve updates
-    }
-
-    fn render_line(
-        &self,
-        ui: &mut egui::Ui,
-        line: &DisplayLine,
-        line_idx: usize,
-        is_left: bool,
-    ) -> Rect {
-        self.line_renderer.render_line(ui, line, line_idx, is_left)
+        if let Some(details) = result.details {
+            println!("Details: {}", details);
+        }
     }
 }
 
@@ -119,26 +73,38 @@ impl eframe::App for DiffViewerApp {
         let action = self.navigation_handler.handle_input(ctx);
         self.handle_navigation_action(action);
 
-        // Update navigation state
-        self.navigation_handler
-            .update_state(self.change_blocks.len(), 0); // TODO: Update connector count
+        // Update navigation state from current state
+        let current_state = self.state_manager.get_current_state();
+        self.navigation_handler.update_state(
+            current_state.change_blocks.len(),
+            current_state.connector_curves.len(),
+        );
 
         // Update viewport height dynamically
         let viewport_height = ctx.screen_rect().height();
         self.scroll_sync.update_viewport_height(viewport_height);
 
+        // Update state with current scroll positions
+        let left_scroll = self.scroll_sync.left_scroll_offset();
+        let right_scroll = self.scroll_sync.right_scroll_offset();
+        self.state_manager.update_state(|state| {
+            state.update_scroll_offsets(left_scroll, right_scroll);
+            state.set_viewport_height(viewport_height);
+        });
+
         egui::CentralPanel::default()
             .frame(egui::Frame::none().fill(Color32::from_rgb(43, 43, 43)))
             .show(ctx, |ui| {
+                let current_state = self.state_manager.get_current_state();
                 self.layout_manager.render_layout(
                     ui,
-                    &self.old_lines,
-                    &self.new_lines,
+                    &current_state.left_lines,
+                    &current_state.right_lines,
                     &mut self.scroll_sync,
                     &self.theme,
                     &mut self.line_renderer,
                     &mut self.connector_renderer,
-                    &self.mapping_segments,
+                    &current_state.mapping_segments,
                 );
             });
     }

@@ -2,7 +2,7 @@
 use egui::epaint::StrokeKind;
 use egui::{Color32, Pos2, Rect, Stroke};
 
-use crate::models::types::LineType;
+use crate::models::line::LineType;
 use crate::theme::JetBrainsTheme;
 
 pub struct ConnectorRenderer {
@@ -17,8 +17,8 @@ impl ConnectorRenderer {
     pub fn draw_connection_lines(
         &self,
         ui: &mut egui::Ui,
-        old_lines: &[crate::models::types::DisplayLine],
-        new_lines: &[crate::models::types::DisplayLine],
+        old_lines: &[crate::models::line::DisplayLine],
+        new_lines: &[crate::models::line::DisplayLine],
     ) {
         // Get stored rectangle positions
         let left_rects: Option<Vec<Rect>> = ui
@@ -71,7 +71,7 @@ impl ConnectorRenderer {
 
             // Draw curved Bézier connectors - JetBrains style
             let max_blocks = left_blocks.len().max(right_blocks.len());
-            let config = crate::models::types::ConnectorConfig::default();
+            let config = crate::models::ui::ConnectorConfig::default();
 
             for block_idx in 0..max_blocks {
                 if let (Some((left_start, left_end)), Some((right_start, right_end))) =
@@ -109,7 +109,7 @@ impl ConnectorRenderer {
                         };
 
                         // Create Bézier connector curve
-                        let curve = crate::models::types::ConnectorCurve::new(
+                        let curve = crate::models::ui::ConnectorCurve::new(
                             left_center,
                             right_center,
                             &config,
@@ -172,7 +172,7 @@ impl ConnectorRenderer {
     fn draw_filled_connector_region(
         &self,
         painter: &egui::Painter,
-        curve: &crate::models::types::ConnectorCurve,
+        curve: &crate::models::ui::ConnectorCurve,
         block_height: f32,
         left_block_height: f32,
         right_block_height: f32,

@@ -1,7 +1,7 @@
 // Line rendering logic for the diff viewer
 use egui::{Color32, FontId, Pos2, Rect};
 
-use crate::models::types::{DisplayLine, LineType};
+use crate::models::line::{DisplayLine, LineType};
 use crate::theme::JetBrainsTheme;
 
 pub struct LineRenderer {

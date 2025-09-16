@@ -5,6 +5,8 @@ use eframe::egui;
 use egui::{FontId, ScrollArea, Vec2};
 
 use crate::config::LayoutConfig;
+use crate::models::diff::MappingSegment;
+use crate::models::line::DisplayLine;
 
 use crate::sync::*;
 
@@ -26,13 +28,13 @@ impl LayoutManager {
     pub fn render_layout(
         &self,
         ui: &mut egui::Ui,
-        old_lines: &[crate::models::DisplayLine],
-        new_lines: &[crate::models::DisplayLine],
+        old_lines: &[DisplayLine],
+        new_lines: &[DisplayLine],
         scroll_sync: &mut crate::sync::ScrollSync,
         theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
         connector_renderer: &mut crate::ui::ConnectorRenderer,
-        mapping_segments: &[crate::models::MappingSegment],
+        mapping_segments: &[MappingSegment],
     ) {
         let total_height = ui.available_height();
         let total_width = ui.available_width();
@@ -83,13 +85,13 @@ impl LayoutManager {
     fn render_left_pane(
         &self,
         ui: &mut egui::Ui,
-        old_lines: &[crate::models::DisplayLine],
+        old_lines: &[DisplayLine],
         scroll_sync: &mut crate::sync::ScrollSync,
         theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
         pane_width: f32,
         total_height: f32,
-        mapping_segments: &[crate::models::MappingSegment],
+        mapping_segments: &[MappingSegment],
     ) {
         ui.allocate_ui_with_layout(
             Vec2::new(pane_width, total_height),
@@ -121,13 +123,13 @@ impl LayoutManager {
     fn render_right_pane(
         &self,
         ui: &mut egui::Ui,
-        new_lines: &[crate::models::DisplayLine],
+        new_lines: &[DisplayLine],
         scroll_sync: &mut crate::sync::ScrollSync,
         theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
         pane_width: f32,
         total_height: f32,
-        mapping_segments: &[crate::models::MappingSegment],
+        mapping_segments: &[MappingSegment],
     ) {
         ui.allocate_ui_with_layout(
             Vec2::new(pane_width, total_height),
@@ -159,8 +161,8 @@ impl LayoutManager {
     fn render_connector_gutter(
         &self,
         ui: &mut egui::Ui,
-        old_lines: &[crate::models::DisplayLine],
-        new_lines: &[crate::models::DisplayLine],
+        old_lines: &[DisplayLine],
+        new_lines: &[DisplayLine],
         connector_renderer: &mut crate::ui::ConnectorRenderer,
         total_height: f32,
     ) {
@@ -198,7 +200,7 @@ impl LayoutManager {
     fn render_scrollable_content(
         &self,
         ui: &mut egui::Ui,
-        lines: &[crate::models::DisplayLine],
+        lines: &[DisplayLine],
         scroll_sync: &mut crate::sync::ScrollSync,
         theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
@@ -206,7 +208,7 @@ impl LayoutManager {
         scroll_id: &str,
         scroll_memory_key: &str,
         rects_memory_key: &str,
-        mapping_segments: &[crate::models::MappingSegment],
+        mapping_segments: &[MappingSegment],
     ) {
         let available_height = ui.available_height();
 

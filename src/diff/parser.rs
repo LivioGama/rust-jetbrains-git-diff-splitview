@@ -1,3 +1,8 @@
+// diffsplit/src/diff/parser.rs
+// Diff parsing module
+
+use crate::models::diff::ChangeBlock;
+use crate::models::line::LineType;
 
 #[derive(Debug, Clone)]
 pub enum Line {
@@ -109,9 +114,9 @@ pub fn create_complete_side_by_side_with_diff(
     current: &str,
     diff_text: &str,
 ) -> (
-    Vec<crate::models::types::DisplayLine>,
-    Vec<crate::models::types::DisplayLine>,
-    Vec<crate::models::types::ChangeBlock>,
+    Vec<crate::models::line::DisplayLine>,
+    Vec<crate::models::line::DisplayLine>,
+    Vec<ChangeBlock>,
 ) {
     let original_lines: Vec<&str> = original.lines().collect();
     let current_lines: Vec<&str> = current.lines().collect();
@@ -127,9 +132,9 @@ pub fn create_complete_side_by_side_with_diff(
             // Add context lines before the hunk
             for i in 0..hunk.old_start.saturating_sub(1) {
                 if i < original_lines.len() {
-                    old_display_lines.push(crate::models::types::DisplayLine {
+                    old_display_lines.push(crate::models::line::DisplayLine {
                         content: original_lines[i].to_string(),
-                        line_type: crate::models::types::LineType::Context,
+                        line_type: crate::models::line::LineType::Context,
                         original_line_num: Some(i + 1),
                         word_highlights: Vec::new(),
                     });
@@ -138,9 +143,9 @@ pub fn create_complete_side_by_side_with_diff(
 
             for i in 0..hunk.new_start.saturating_sub(1) {
                 if i < current_lines.len() {
-                    new_display_lines.push(crate::models::types::DisplayLine {
+                    new_display_lines.push(crate::models::line::DisplayLine {
                         content: current_lines[i].to_string(),
-                        line_type: crate::models::types::LineType::Context,
+                        line_type: crate::models::line::LineType::Context,
                         original_line_num: Some(i + 1),
                         word_highlights: Vec::new(),
                     });
@@ -155,17 +160,17 @@ pub fn create_complete_side_by_side_with_diff(
                 match line {
                     Line::Context(content) => {
                         if old_line_idx <= original_lines.len() {
-                            old_display_lines.push(crate::models::types::DisplayLine {
+                            old_display_lines.push(crate::models::line::DisplayLine {
                                 content: content.clone(),
-                                line_type: crate::models::types::LineType::Context,
+                                line_type: crate::models::line::LineType::Context,
                                 original_line_num: Some(old_line_idx),
                                 word_highlights: Vec::new(),
                             });
                         }
                         if new_line_idx <= current_lines.len() {
-                            new_display_lines.push(crate::models::types::DisplayLine {
+                            new_display_lines.push(crate::models::line::DisplayLine {
                                 content: content.clone(),
-                                line_type: crate::models::types::LineType::Context,
+                                line_type: crate::models::line::LineType::Context,
                                 original_line_num: Some(new_line_idx),
                                 word_highlights: Vec::new(),
                             });
@@ -174,18 +179,18 @@ pub fn create_complete_side_by_side_with_diff(
                         new_line_idx += 1;
                     }
                     Line::Addition(content) => {
-                        new_display_lines.push(crate::models::types::DisplayLine {
+                        new_display_lines.push(crate::models::line::DisplayLine {
                             content: content.clone(),
-                            line_type: crate::models::types::LineType::Addition,
+                            line_type: crate::models::line::LineType::Addition,
                             original_line_num: Some(new_line_idx),
                             word_highlights: Vec::new(),
                         });
                         new_line_idx += 1;
                     }
                     Line::Deletion(content) => {
-                        old_display_lines.push(crate::models::types::DisplayLine {
+                        old_display_lines.push(crate::models::line::DisplayLine {
                             content: content.clone(),
-                            line_type: crate::models::types::LineType::Deletion,
+                            line_type: crate::models::line::LineType::Deletion,
                             original_line_num: Some(old_line_idx),
                             word_highlights: Vec::new(),
                         });
@@ -210,11 +215,11 @@ pub fn create_complete_side_by_side_with_diff(
                     Line::Deletion(_) => old_count += 1,
                     Line::Context(_) => {
                         if old_count > 0 || new_count > 0 {
-                            change_blocks.push(crate::models::types::ChangeBlock {
+                            change_blocks.push(ChangeBlock {
                                 line_type: if old_count > 0 {
-                                    crate::models::types::LineType::Deletion
+                                    crate::models::line::LineType::Deletion
                                 } else {
-                                    crate::models::types::LineType::Addition
+                                    crate::models::line::LineType::Addition
                                 },
                                 start_line: old_start,
                                 end_line: old_start + old_count - 1,
@@ -233,11 +238,11 @@ pub fn create_complete_side_by_side_with_diff(
             }
 
             if old_count > 0 || new_count > 0 {
-                change_blocks.push(crate::models::types::ChangeBlock {
+                change_blocks.push(ChangeBlock {
                     line_type: if old_count > 0 {
-                        crate::models::types::LineType::Deletion
+                        crate::models::line::LineType::Deletion
                     } else {
-                        crate::models::types::LineType::Addition
+                        crate::models::line::LineType::Addition
                     },
                     start_line: old_start,
                     end_line: old_start + old_count - 1,
