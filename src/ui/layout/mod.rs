@@ -63,6 +63,7 @@ impl LayoutManager {
                     old_lines,
                     new_lines,
                     connector_renderer,
+                    theme,
                     total_height,
                 );
 
@@ -164,16 +165,37 @@ impl LayoutManager {
         old_lines: &[DisplayLine],
         new_lines: &[DisplayLine],
         connector_renderer: &mut crate::ui::ConnectorRenderer,
+        theme: &crate::theme::JetBrainsTheme,
         total_height: f32,
     ) {
-        ui.allocate_ui_with_layout(
-            Vec2::new(self.config.connector_column_width, total_height),
-            egui::Layout::top_down(egui::Align::Center),
-            |ui| {
-                // Draw connection lines
-                connector_renderer.draw_connection_lines(ui, old_lines, new_lines);
-            },
-        );
+        // Create a frame with proper background color
+        let frame = egui::Frame::new()
+            .fill(theme.connector_column)
+            .inner_margin(egui::Margin::ZERO)
+            .outer_margin(egui::Margin::ZERO);
+
+        frame.show(ui, |ui| {
+            ui.allocate_ui_with_layout(
+                Vec2::new(self.config.connector_column_width, total_height),
+                egui::Layout::top_down(egui::Align::Center),
+                |ui| {
+                    // Ensure the full height is used and background is filled
+                    let full_rect = ui
+                        .allocate_response(
+                            Vec2::new(self.config.connector_column_width, total_height),
+                            egui::Sense::hover(),
+                        )
+                        .rect;
+
+                    // Fill the entire connector area with theme background
+                    ui.painter()
+                        .rect_filled(full_rect, 0.0, theme.connector_column);
+
+                    // Draw connection lines
+                    connector_renderer.draw_connection_lines(ui, old_lines, new_lines);
+                },
+            );
+        });
     }
 
     /// Render a pane header

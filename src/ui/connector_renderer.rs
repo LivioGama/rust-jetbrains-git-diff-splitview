@@ -31,141 +31,14 @@ impl ConnectorRenderer {
         if let (Some(left_rects), Some(right_rects)) = (left_rects, right_rects) {
             let painter = ui.painter();
 
-            // Find all modified blocks
-            let mut left_blocks = Vec::new();
-            let mut right_blocks = Vec::new();
-
-            // Find left pane blocks
-            let mut i = 0;
-            while i < old_lines.len() {
-                if old_lines[i].line_type != LineType::Context {
-                    let start = i;
-                    let change_type = old_lines[i].line_type.clone();
-                    let mut end = i;
-                    while end + 1 < old_lines.len() && old_lines[end + 1].line_type == change_type {
-                        end += 1;
-                    }
-                    left_blocks.push((start, end));
-                    i = end + 1;
-                } else {
-                    i += 1;
-                }
-            }
-
-            // Find right pane blocks
-            let mut j = 0;
-            while j < new_lines.len() {
-                if new_lines[j].line_type != LineType::Context {
-                    let start = j;
-                    let change_type = new_lines[j].line_type.clone();
-                    let mut end = j;
-                    while end + 1 < new_lines.len() && new_lines[end + 1].line_type == change_type {
-                        end += 1;
-                    }
-                    right_blocks.push((start, end));
-                    j = end + 1;
-                } else {
-                    j += 1;
-                }
-            }
-
-            // Draw curved Bézier connectors - JetBrains style
-            let max_blocks = left_blocks.len().max(right_blocks.len());
-            let config = crate::models::ui::ConnectorConfig::default();
-
-            for block_idx in 0..max_blocks {
-                if let (Some((left_start, left_end)), Some((right_start, right_end))) =
-                    (left_blocks.get(block_idx), right_blocks.get(block_idx))
-                {
-                    if *left_start < left_rects.len() && *right_start < right_rects.len() {
-                        let left_first_rect = &left_rects[*left_start];
-                        let left_last_rect = &left_rects[*left_end];
-                        let right_first_rect = &right_rects[*right_start];
-                        let right_last_rect = &right_rects[*right_end];
-
-                        // Calculate block centers for connector attachment
-                        let left_center_y = (left_first_rect.min.y + left_last_rect.max.y) / 2.0;
-                        let right_center_y = (right_first_rect.min.y + right_last_rect.max.y) / 2.0;
-
-                        let left_center = Pos2::new(left_first_rect.max.x, left_center_y);
-                        let right_center = Pos2::new(right_first_rect.min.x, right_center_y);
-
-                        // Determine change type for color
-                        let change_type = if old_lines[*left_start].line_type == LineType::Deletion
-                            && new_lines[*right_start].line_type == LineType::Addition
-                        {
-                            "modification"
-                        } else if old_lines[*left_start].line_type == LineType::Deletion {
-                            "deletion"
-                        } else {
-                            "addition"
-                        };
-
-                        let connector_color = match change_type {
-                            "addition" => Color32::from_rgb(76, 175, 80), // Green
-                            "deletion" => Color32::from_rgb(244, 67, 54), // Red
-                            "modification" => Color32::from_rgb(255, 193, 7), // Yellow
-                            _ => Color32::from_rgb(100, 150, 200),
-                        };
-
-                        // Create Bézier connector curve
-                        let curve = crate::models::ui::ConnectorCurve::new(
-                            left_center,
-                            right_center,
-                            &config,
-                            connector_color,
-                            format!("block_{}", block_idx),
-                        );
-
-                        // Calculate block height for multi-line detection
-                        let left_block_height =
-                            (left_end - left_start + 1) as f32 * self.theme.line_height;
-                        let right_block_height =
-                            (right_end - right_start + 1) as f32 * self.theme.line_height;
-                        let max_block_height = left_block_height.max(right_block_height);
-
-                        // Determine if this is a multi-line block
-                        let is_multi_line =
-                            (left_end - left_start) > 0 || (right_end - right_start) > 0;
-
-                        if is_multi_line {
-                            // Create larger filled region for multi-line blocks positioned at bottom/top
-                            self.draw_filled_connector_region(
-                                painter,
-                                &curve,
-                                max_block_height,
-                                left_block_height,
-                                right_block_height,
-                                &left_rects,
-                                &right_rects,
-                                *left_start,
-                                *left_end,
-                                *right_start,
-                                *right_end,
-                            );
-                        } else {
-                            // Draw simple Bézier curve for single-line blocks
-                            painter.add(egui::epaint::Shape::CubicBezier(
-                                egui::epaint::CubicBezierShape {
-                                    points: [
-                                        curve.start,
-                                        curve.control1,
-                                        curve.control2,
-                                        curve.end,
-                                    ],
-                                    closed: false,
-                                    fill: Color32::TRANSPARENT,
-                                    stroke: Stroke::new(
-                                        curve.thickness,
-                                        curve.color.gamma_multiply(0.8),
-                                    )
-                                    .into(),
-                                },
-                            ));
-                        }
-                    }
-                }
-            }
+            // JetBrains approach: Draw connectors based on logical change relationships
+            self.draw_jetbrains_connectors(
+                painter,
+                old_lines,
+                new_lines,
+                &left_rects,
+                &right_rects,
+            );
         }
     }
 
@@ -193,16 +66,15 @@ impl ConnectorRenderer {
             let right_first_rect = &right_rects[right_start];
             let right_last_rect = &right_rects[right_end.min(right_rects.len() - 1)];
 
-            // Calculate the bounds of all rectangles in the block
-            let left_min_x = left_first_rect.min.x;
-            let left_max_x = left_last_rect.max.x;
-            let right_min_x = right_first_rect.min.x;
-            let right_max_x = right_last_rect.max.x;
+            // Calculate precise bounds for better alignment
+            let left_max_x = left_first_rect.max.x - 5.0; // Slightly inset from line edge
+            let right_min_x = right_first_rect.min.x + 5.0; // Slightly inset from line edge
 
+            // Use exact line bounds for vertical alignment
             let top_y = left_first_rect.min.y.min(right_first_rect.min.y);
             let bottom_y = left_last_rect.max.y.max(right_last_rect.max.y);
 
-            // Create rectangle covering the entire block area
+            // Create rectangle covering the connector area with precise alignment
             let block_rect = Rect::from_min_max(
                 Pos2::new(left_max_x, top_y),
                 Pos2::new(right_min_x, bottom_y),
@@ -210,15 +82,15 @@ impl ConnectorRenderer {
 
             // Fill the rectangle with semi-transparent color
             painter.add(egui::epaint::Shape::rect_filled(
-                block_rect, 0.0, // No corner radius
+                block_rect, 2.0, // Slight corner radius for better aesthetics
                 fill_color,
             ));
 
-            // Draw outline around the filled area
+            // Draw subtle outline around the filled area for definition
             painter.add(egui::epaint::Shape::rect_stroke(
                 block_rect,
-                0.0, // No corner radius
-                Stroke::new(curve.thickness * 1.5, curve.color.gamma_multiply(0.9)),
+                2.0,                                               // Matching corner radius
+                Stroke::new(1.0, curve.color.gamma_multiply(0.6)), // Thinner, more subtle outline
                 StrokeKind::Middle,
             ));
         }
@@ -312,5 +184,127 @@ impl ConnectorRenderer {
                 Stroke::new(1.0, stroke_color),
             ));
         }
+    }
+
+    /// JetBrains-style connector rendering for independent line arrays
+    fn draw_jetbrains_connectors(
+        &self,
+        painter: &egui::Painter,
+        old_lines: &[crate::models::line::DisplayLine],
+        new_lines: &[crate::models::line::DisplayLine],
+        left_rects: &[egui::Rect],
+        right_rects: &[egui::Rect],
+    ) {
+        let config = crate::models::ui::ConnectorConfig::default();
+
+        // Find deletion blocks on left side
+        let deletion_blocks = self.find_change_blocks(old_lines, LineType::Deletion);
+
+        // Find addition blocks on right side
+        let addition_blocks = self.find_change_blocks(new_lines, LineType::Addition);
+
+        // Draw deletion connectors (red, pointing from left to middle)
+        for (start, end) in deletion_blocks {
+            if start < left_rects.len() && end < left_rects.len() {
+                let start_rect = &left_rects[start];
+                let end_rect = &left_rects[end];
+
+                let center_y = (start_rect.min.y + end_rect.max.y) / 2.0;
+                let left_point = Pos2::new(start_rect.max.x, center_y);
+                let right_point = Pos2::new(left_point.x + 30.0, center_y);
+
+                self.draw_single_connector(
+                    painter,
+                    left_point,
+                    right_point,
+                    &config,
+                    Color32::from_rgb(244, 67, 54), // Red for deletions
+                    end - start > 0,                // Multi-line
+                );
+            }
+        }
+
+        // Draw addition connectors (green, pointing from middle to right)
+        for (start, end) in addition_blocks {
+            if start < right_rects.len() && end < right_rects.len() {
+                let start_rect = &right_rects[start];
+                let end_rect = &right_rects[end];
+
+                let center_y = (start_rect.min.y + end_rect.max.y) / 2.0;
+                let right_point = Pos2::new(start_rect.min.x, center_y);
+                let left_point = Pos2::new(right_point.x - 30.0, center_y);
+
+                self.draw_single_connector(
+                    painter,
+                    left_point,
+                    right_point,
+                    &config,
+                    Color32::from_rgb(76, 175, 80), // Green for additions
+                    end - start > 0,                // Multi-line
+                );
+            }
+        }
+    }
+
+    fn draw_single_connector(
+        &self,
+        painter: &egui::Painter,
+        start_point: Pos2,
+        end_point: Pos2,
+        config: &crate::models::ui::ConnectorConfig,
+        color: Color32,
+        is_multi_line: bool,
+    ) {
+        let curve = crate::models::ui::ConnectorCurve::new(
+            start_point,
+            end_point,
+            config,
+            color,
+            "connector".to_string(),
+        );
+
+        let thickness = if is_multi_line {
+            config.ribbon_width * 1.2
+        } else {
+            config.ribbon_width * 0.8
+        };
+
+        painter.add(egui::epaint::Shape::CubicBezier(
+            egui::epaint::CubicBezierShape {
+                points: [curve.start, curve.control1, curve.control2, curve.end],
+                closed: false,
+                fill: Color32::TRANSPARENT,
+                stroke: Stroke::new(thickness, color.gamma_multiply(0.7)).into(),
+            },
+        ));
+    }
+
+    /// Find change blocks of a specific type in a line array
+    fn find_change_blocks(
+        &self,
+        lines: &[crate::models::line::DisplayLine],
+        line_type: LineType,
+    ) -> Vec<(usize, usize)> {
+        let mut blocks = Vec::new();
+        let mut i = 0;
+
+        while i < lines.len() {
+            if lines[i].line_type == line_type {
+                let start = i;
+                let mut end = i;
+
+                // Find consecutive lines of the same change type
+                while end + 1 < lines.len() && lines[end + 1].line_type == line_type {
+                    end += 1;
+                }
+
+                blocks.push((start, end));
+                i = end + 1;
+            } else {
+                i += 1;
+            }
+        }
+
+        blocks
     }
 }

@@ -231,20 +231,9 @@ impl HighlightRenderer {
 
     // Step 2 — Draw highlights
     pub fn draw_highlight(&self, ui: &mut egui::Ui, rect: Rect) {
-        // Fill highlight with semi-transparent blue
-        ui.painter().rect_filled(
-            rect,
-            egui::CornerRadius::same(4),
-            Color32::from_rgba_premultiplied(51, 130, 255, 32),
-        );
-
-        // Stroke highlight border
-        ui.painter().rect_stroke(
-            rect,
-            egui::CornerRadius::same(4),
-            Stroke::new(1.0, Color32::from_rgba_premultiplied(51, 130, 255, 64)),
-            egui::epaint::StrokeKind::Inside,
-        );
+        // Fill highlight with semi-transparent green - no borders
+        ui.painter()
+            .rect_filled(rect, 0.0, Color32::from_rgba_premultiplied(73, 156, 84, 25));
     }
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {
@@ -356,11 +345,8 @@ impl ConnectorRenderer {
         let path_shape = PathShape {
             points,
             closed: true,
-            fill: Color32::from_rgba_premultiplied(51, 130, 255, 32),
-            stroke: egui::epaint::PathStroke::new(
-                1.0,
-                Color32::from_rgba_premultiplied(51, 130, 255, 56),
-            ),
+            fill: Color32::from_rgba_premultiplied(73, 156, 84, 25),
+            stroke: egui::epaint::PathStroke::NONE,
         };
 
         ui.painter().add(Shape::Path(path_shape));

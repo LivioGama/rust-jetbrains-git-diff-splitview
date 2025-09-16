@@ -20,12 +20,12 @@ impl Default for ConnectorConfig {
         Self {
             column_width: 45.0,
             line_height: 20.0,
-            tension_x: 0.35,
-            tension_y: 0.10,
-            min_control_offset: 6.0,
-            max_control_offset: 14.0,
-            ribbon_width: 3.0,
-            opacity: 0.4,
+            tension_x: 0.25, // Reduced for straighter, better-aligned connectors
+            tension_y: 0.05, // Reduced for less vertical curve distortion
+            min_control_offset: 8.0, // Increased for smoother curves
+            max_control_offset: 18.0, // Increased for better curve shape
+            ribbon_width: 2.5, // Slightly thinner for cleaner appearance
+            opacity: 0.35,   // Slightly reduced for better background blend
         }
     }
 }

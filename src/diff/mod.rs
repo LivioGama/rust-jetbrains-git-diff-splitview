@@ -1,215 +1,54 @@
 pub mod parser;
 
+// Re-export main functions and types from parser
+pub use parser::{create_complete_side_by_side_with_diff, DiffOp, DiffResult, JetBrainsDiff};
 
 use crate::models::*;
 use std::collections::HashSet;
 
-pub fn create_complete_side_by_side_with_diff(
-    original: &str,
-    current: &str,
-    diff_text: &str,
-) -> (Vec<DisplayLine>, Vec<DisplayLine>, Vec<ChangeBlock>) {
-    let original_lines: Vec<&str> = original.lines().collect();
-    let current_lines: Vec<&str> = current.lines().collect();
-
-    // Parse diff to identify changed sections using correct line number tracking
-    let diff = parser::parse_diff(diff_text);
-    let mut changed_lines = HashSet::new();
-    let mut addition_lines = HashSet::new();
-    let mut deletion_lines = HashSet::new();
-
-    if !diff.files.is_empty() {
-        for hunk in &diff.files[0].hunks {
-            let mut old_line = hunk.old_start;
-            let mut new_line = hunk.new_start;
-
-            for line in &hunk.lines {
-                match line {
-                    parser::Line::Context(_) => {
-                        // Context lines are unchanged, just advance line counters
-                        old_line += 1;
-                        new_line += 1;
-                    }
-                    parser::Line::Deletion(_) => {
-                        // Deletion exists at old_line in original file
-                        if old_line <= original_lines.len() {
-                            let index = old_line as usize;
-                            deletion_lines.insert(index);
-                            changed_lines.insert(index);
-                        }
-                        old_line += 1;
-                    }
-                    parser::Line::Addition(_) => {
-                        // Addition exists at new_line in current file
-                        if new_line <= current_lines.len() {
-                            let index = new_line as usize;
-                            addition_lines.insert(index);
-                            changed_lines.insert(index);
-                        }
-                        new_line += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    let mut old_lines = Vec::new();
-    let mut new_lines = Vec::new();
-
-    let max_lines = original_lines.len().max(current_lines.len());
-
-    for i in 0..max_lines {
-        let orig_line = original_lines.get(i);
-        let curr_line = current_lines.get(i);
-
-        match (orig_line, curr_line) {
-            (Some(o), Some(c)) => {
-                let is_changed = changed_lines.contains(&i);
-                let is_addition = addition_lines.contains(&i);
-                let is_deletion = deletion_lines.contains(&i);
-
-                // Determine line type based on diff analysis
-                let (old_line_type, new_line_type) = if is_deletion && is_addition {
-                    // This line was modified (deletion + addition at same position)
-                    (LineType::Deletion, LineType::Addition)
-                } else if is_deletion {
-                    // Pure deletion - line only exists in old
-                    (LineType::Deletion, LineType::Empty)
-                } else if is_addition {
-                    // Pure addition - line only exists in new
-                    (LineType::Empty, LineType::Addition)
-                } else if is_changed {
-                    // Context line in changed region
-                    (LineType::Context, LineType::Context)
-                } else {
-                    // Unchanged line
-                    (LineType::Context, LineType::Context)
-                };
-
-                // Calculate word-level highlights for modifications
-                let word_highlights = if o != c && (is_deletion || is_addition) {
-                    calculate_word_diffs(o, c)
-                } else {
-                    Vec::new()
-                };
-
-                old_lines.push(DisplayLine {
-                    content: o.to_string(),
-                    line_type: old_line_type,
-                    original_line_num: Some(i + 1),
-                    word_highlights: word_highlights.clone(),
-                });
-                new_lines.push(DisplayLine {
-                    content: c.to_string(),
-                    line_type: new_line_type,
-                    original_line_num: Some(i + 1),
-                    word_highlights,
-                });
-            }
-            (Some(o), None) => {
-                old_lines.push(DisplayLine {
-                    content: o.to_string(),
-                    line_type: LineType::Deletion,
-                    original_line_num: Some(i + 1),
-                    word_highlights: Vec::new(),
-                });
-                new_lines.push(DisplayLine {
-                    content: "".to_string(),
-                    line_type: LineType::Empty,
-                    original_line_num: None,
-                    word_highlights: Vec::new(),
-                });
-            }
-            (None, Some(c)) => {
-                old_lines.push(DisplayLine {
-                    content: "".to_string(),
-                    line_type: LineType::Empty,
-                    original_line_num: None,
-                    word_highlights: Vec::new(),
-                });
-                new_lines.push(DisplayLine {
-                    content: c.to_string(),
-                    line_type: LineType::Addition,
-                    original_line_num: Some(i + 1),
-                    word_highlights: Vec::new(),
-                });
-            }
-            (None, None) => {
-                // This shouldn't happen in normal diff scenarios, but handle it gracefully
-            }
-        }
-    }
-
-    // Create change blocks for trapezoidal connectors
-    let change_blocks = detect_change_blocks(&old_lines, &new_lines);
-
-    (old_lines, new_lines, change_blocks)
-}
-
+/// Calculate word-level differences between two strings
 pub fn calculate_word_diffs(original: &str, current: &str) -> Vec<(usize, usize)> {
-    let mut highlights = Vec::new();
-
-    if original.is_empty() || current.is_empty() {
-        return highlights;
+    if original == current {
+        return Vec::new();
     }
 
-    // Improved word-based diff using simple LCS approach
+    let mut highlights = Vec::new();
     let orig_words: Vec<&str> = original.split_whitespace().collect();
     let curr_words: Vec<&str> = current.split_whitespace().collect();
 
-    // Find differences using a simple approach
-    let mut orig_idx = 0;
-    let mut curr_idx = 0;
-
-    while orig_idx < orig_words.len() && curr_idx < curr_words.len() {
-        if orig_words[orig_idx] == curr_words[curr_idx] {
-            // Words match, move both indices
-            orig_idx += 1;
-            curr_idx += 1;
-        } else {
-            // Words differ, mark the original word as changed
-            let word_start = original
-                .split_whitespace()
-                .take(orig_idx)
-                .map(|w| w.len() + 1)
-                .sum::<usize>();
-
-            let word_len = orig_words[orig_idx].len();
-            highlights.push((word_start, word_start + word_len));
-
-            // Try to find this word later in current
-            let mut found = false;
-            for j in curr_idx..curr_words.len() {
-                if orig_words[orig_idx] == curr_words[j] {
-                    curr_idx = j + 1;
-                    found = true;
-                    break;
-                }
-            }
-
-            if !found {
-                curr_idx += 1;
-            }
-            orig_idx += 1;
-        }
+    if orig_words.is_empty() {
+        return highlights;
     }
 
-    // Handle remaining words in original
-    while orig_idx < orig_words.len() {
-        let word_start = original
-            .split_whitespace()
-            .take(orig_idx)
-            .map(|w| w.len() + 1)
-            .sum::<usize>();
+    // Simple word-based diff using position tracking
+    let mut orig_pos = 0;
+    let mut curr_pos = 0;
 
-        let word_len = orig_words[orig_idx].len();
-        highlights.push((word_start, word_start + word_len));
-        orig_idx += 1;
+    for (i, orig_word) in orig_words.iter().enumerate() {
+        // Find the actual position of this word in the original string
+        if let Some(word_start) = original[orig_pos..].find(orig_word) {
+            let actual_start = orig_pos + word_start;
+            let actual_end = actual_start + orig_word.len();
+
+            // Check if this word exists in the corresponding position in current
+            let word_differs = if i < curr_words.len() {
+                curr_words[i] != *orig_word
+            } else {
+                true // Word doesn't exist in current version
+            };
+
+            if word_differs {
+                highlights.push((actual_start, actual_end));
+            }
+
+            orig_pos = actual_end;
+        }
     }
 
     highlights
 }
 
+/// Detect change blocks from display lines (legacy function for compatibility)
 pub fn detect_change_blocks(
     old_lines: &[DisplayLine],
     new_lines: &[DisplayLine],
@@ -240,53 +79,39 @@ pub fn detect_change_blocks(
                 end += 1;
             }
 
-            // Calculate actual line ranges for left and right panes
-            let left_start = start.min(old_lines.len().saturating_sub(1));
-            let left_end = end.min(old_lines.len().saturating_sub(1));
-            let right_start = start.min(new_lines.len().saturating_sub(1));
-            let right_end = end.min(new_lines.len().saturating_sub(1));
-
-            // Determine the primary block type with better logic
+            // Determine the primary block type
             let mut has_deletions = false;
             let mut has_additions = false;
-            let mut has_modifications = false;
 
             // Check left pane for deletions
-            for idx in left_start..=left_end {
+            for idx in start..=end {
                 if idx < old_lines.len() && old_lines[idx].line_type == LineType::Deletion {
                     has_deletions = true;
                 }
             }
 
             // Check right pane for additions
-            for idx in right_start..=right_end {
+            for idx in start..=end {
                 if idx < new_lines.len() && new_lines[idx].line_type == LineType::Addition {
                     has_additions = true;
                 }
             }
 
-            // Check for modifications (context lines with word highlights)
-            for idx in left_start..=left_end {
-                if idx < old_lines.len() && !old_lines[idx].word_highlights.is_empty() {
-                    has_modifications = true;
-                }
-            }
-
-            // Determine block type with priority: deletions > additions > modifications
-            let block_type = if has_deletions {
+            // Determine block type with priority: modifications > deletions > additions
+            let block_type = if has_deletions && has_additions {
+                LineType::Deletion // Modifications are represented as deletions with corresponding additions
+            } else if has_deletions {
                 LineType::Deletion
             } else if has_additions {
                 LineType::Addition
-            } else if has_modifications {
-                LineType::Context // Modifications are marked as Context with highlights
             } else {
                 LineType::Context
             };
 
             blocks.push(ChangeBlock {
                 line_type: block_type,
-                start_line: left_start,
-                end_line: left_end,
+                start_line: start,
+                end_line: end,
                 left_rects: Vec::new(),
                 right_rects: Vec::new(),
             });
@@ -297,33 +122,51 @@ pub fn detect_change_blocks(
         }
     }
 
-    // Post-process blocks to merge adjacent blocks of the same type
-    let mut merged_blocks = Vec::new();
-    let mut current_block: Option<ChangeBlock> = None;
+    blocks
+}
 
-    for block in blocks {
-        if let Some(ref mut curr) = current_block {
-            // Check if we can merge with the current block
-            let can_merge =
-                curr.line_type == block.line_type && curr.end_line + 1 >= block.start_line;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-            if can_merge {
-                // Merge the blocks
-                curr.end_line = curr.end_line.max(block.end_line);
-            } else {
-                // Can't merge, push current and start new
-                merged_blocks.push(current_block.take().unwrap());
-                current_block = Some(block);
-            }
-        } else {
-            current_block = Some(block);
+    #[test]
+    fn test_word_diffs() {
+        let original = "hello world test";
+        let current = "hello universe test";
+        let diffs = calculate_word_diffs(original, current);
+
+        // Should highlight "world" since it changed to "universe"
+        assert!(!diffs.is_empty());
+    }
+
+    #[test]
+    fn test_no_word_diffs() {
+        let original = "hello world";
+        let current = "hello world";
+        let diffs = calculate_word_diffs(original, current);
+
+        assert!(diffs.is_empty());
+    }
+
+    #[test]
+    fn test_create_side_by_side_no_diff() {
+        let original = "line1\nline2\nline3";
+        let current = "line1\nline2\nline3";
+        let diff = "";
+
+        let (old_lines, new_lines, blocks) =
+            create_complete_side_by_side_with_diff(original, current, diff);
+
+        assert_eq!(old_lines.len(), 3);
+        assert_eq!(new_lines.len(), 3);
+        assert_eq!(blocks.len(), 0);
+
+        // All lines should be context
+        for line in &old_lines {
+            assert_eq!(line.line_type, LineType::Context);
+        }
+        for line in &new_lines {
+            assert_eq!(line.line_type, LineType::Context);
         }
     }
-
-    // Push the last block
-    if let Some(block) = current_block {
-        merged_blocks.push(block);
-    }
-
-    merged_blocks
 }

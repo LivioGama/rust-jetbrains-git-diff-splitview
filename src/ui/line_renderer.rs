@@ -40,10 +40,13 @@ impl LineRenderer {
         // Ensure identical baseline positioning for both panes
         let baseline_y = rect.min.y + line_height - 3.0;
 
+        // Always fill the entire line background first to prevent white background
+        ui.painter().rect_filled(rect, 0.0, self.theme.background);
+
         // JetBrains-style background colors for diff highlighting using theme
         let bg_color = self.theme.get_line_background(&line.line_type);
 
-        // First draw JetBrains-style highlight if this is a changed line
+        // Draw JetBrains-style highlight for changed lines
         if line.line_type != LineType::Context {
             self.highlight_renderer.draw_highlight(ui, rect);
         } else if bg_color != Color32::TRANSPARENT {
