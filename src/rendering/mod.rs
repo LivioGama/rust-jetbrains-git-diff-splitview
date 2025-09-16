@@ -3,6 +3,7 @@
 
 use crate::models::*;
 use crate::theme::JetBrainsTheme;
+use egui::epaint::{PathShape, Shape};
 use egui::{Color32, FontId, Pos2, Rect, Stroke};
 
 /// Rendering context for managing rendering state
@@ -218,6 +219,39 @@ impl LineRenderer {
     }
 }
 
+/// Highlight renderer for JetBrains-style highlights
+pub struct HighlightRenderer {
+    theme: JetBrainsTheme,
+}
+
+impl HighlightRenderer {
+    pub fn new(theme: JetBrainsTheme) -> Self {
+        Self { theme }
+    }
+
+    // Step 2 — Draw highlights
+    pub fn draw_highlight(&self, ui: &mut egui::Ui, rect: Rect) {
+        // Fill highlight with semi-transparent blue
+        ui.painter().rect_filled(
+            rect,
+            egui::CornerRadius::same(4),
+            Color32::from_rgba_premultiplied(51, 130, 255, 32),
+        );
+
+        // Stroke highlight border
+        ui.painter().rect_stroke(
+            rect,
+            egui::CornerRadius::same(4),
+            Stroke::new(1.0, Color32::from_rgba_premultiplied(51, 130, 255, 64)),
+            egui::epaint::StrokeKind::Inside,
+        );
+    }
+
+    pub fn update_theme(&mut self, theme: JetBrainsTheme) {
+        self.theme = theme;
+    }
+}
+
 /// Connector renderer for rendering connection lines
 pub struct ConnectorRenderer {
     theme: JetBrainsTheme,
@@ -243,6 +277,119 @@ impl ConnectorRenderer {
                 self.render_connection_block(ui, block, *left_rect, *right_rect, block_idx);
             }
         }
+    }
+
+    // Enhanced connector rendering with JetBrains-style curved paths
+    pub fn render_jetbrains_connector(
+        &self,
+        ui: &mut egui::Ui,
+        left_rect: Rect,
+        right_rect: Rect,
+        gutter_width: f32,
+    ) {
+        // Step 3 — Connector anchor points
+        let x0 = left_rect.right();
+        let y0_top = left_rect.top() + 2.0;
+        let y0_bottom = left_rect.bottom() - 2.0;
+
+        let x1 = right_rect.left();
+        let y1_top = right_rect.top() + 2.0;
+        let y1_bottom = right_rect.bottom() - 2.0;
+
+        // Step 4 — Build connector path
+        let stroke = Stroke::new(1.0, Color32::from_rgba_premultiplied(51, 130, 255, 56));
+
+        // Calculate control points for cubic Bézier curves
+        let mut cp1_x = x0 + gutter_width * 0.35;
+        let mut cp2_x = x1 - gutter_width * 0.35;
+        let mut cp1_y = y0_top;
+        let mut cp2_y = y1_top;
+
+        // Step 5 — S-shape adjustment for vertical offset
+        if y0_top != y1_top {
+            let y_diff = y1_top - y0_top;
+            cp1_y = y0_top + y_diff * 0.2;
+            cp2_y = y1_top - y_diff * 0.2;
+        }
+
+        // Create closed path for connector shape
+        let mut points = Vec::new();
+
+        // Move to start top
+        points.push(Pos2::new(x0, y0_top));
+
+        // Top cubic Bézier curve
+        let top_curve_points = self.cubic_bezier_points(
+            Pos2::new(x0, y0_top),
+            Pos2::new(cp1_x, cp1_y),
+            Pos2::new(cp2_x, cp2_y),
+            Pos2::new(x1, y1_top),
+            20, // number of segments
+        );
+        points.extend(top_curve_points);
+
+        // Line down right side
+        points.push(Pos2::new(x1, y1_bottom));
+
+        // Bottom cubic Bézier curve (reverse direction)
+        let mut cp1_y_bottom = y0_bottom;
+        let mut cp2_y_bottom = y1_bottom;
+        if y0_bottom != y1_bottom {
+            let y_diff = y1_bottom - y0_bottom;
+            cp1_y_bottom = y0_bottom + y_diff * 0.2;
+            cp2_y_bottom = y1_bottom - y_diff * 0.2;
+        }
+
+        let bottom_curve_points = self.cubic_bezier_points(
+            Pos2::new(x1, y1_bottom),
+            Pos2::new(cp2_x, cp2_y_bottom),
+            Pos2::new(cp1_x, cp1_y_bottom),
+            Pos2::new(x0, y0_bottom),
+            20,
+        );
+        points.extend(bottom_curve_points);
+
+        // Close path back to start
+        points.push(Pos2::new(x0, y0_top));
+
+        // Step 6 — Draw connector
+        let path_shape = PathShape {
+            points,
+            closed: true,
+            fill: Color32::from_rgba_premultiplied(51, 130, 255, 32),
+            stroke: egui::epaint::PathStroke::new(
+                1.0,
+                Color32::from_rgba_premultiplied(51, 130, 255, 56),
+            ),
+        };
+
+        ui.painter().add(Shape::Path(path_shape));
+    }
+
+    // Helper function to generate cubic Bézier curve points
+    fn cubic_bezier_points(
+        &self,
+        p0: Pos2,
+        p1: Pos2,
+        p2: Pos2,
+        p3: Pos2,
+        segments: usize,
+    ) -> Vec<Pos2> {
+        let mut points = Vec::new();
+        for i in 1..=segments {
+            let t = i as f32 / segments as f32;
+            let u = 1.0 - t;
+            let u2 = u * u;
+            let u3 = u2 * u;
+            let t2 = t * t;
+            let t3 = t2 * t;
+
+            let x = u3 * p0.x + 3.0 * u2 * t * p1.x + 3.0 * u * t2 * p2.x + t3 * p3.x;
+            let y = u3 * p0.y + 3.0 * u2 * t * p1.y + 3.0 * u * t2 * p2.y + t3 * p3.y;
+
+            points.push(Pos2::new(x, y));
+        }
+        points
     }
 
     fn render_connection_block(
@@ -288,6 +435,96 @@ impl ConnectorRenderer {
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {
         self.theme = theme;
+    }
+}
+
+/// Enhanced rendering system for JetBrains-style diff viewer
+pub struct JetBrainsRenderer {
+    pub line_renderer: LineRenderer,
+    pub highlight_renderer: HighlightRenderer,
+    pub connector_renderer: ConnectorRenderer,
+}
+
+impl JetBrainsRenderer {
+    pub fn new(theme: JetBrainsTheme) -> Self {
+        Self {
+            line_renderer: LineRenderer::new(theme.clone()),
+            highlight_renderer: HighlightRenderer::new(theme.clone()),
+            connector_renderer: ConnectorRenderer::new(theme),
+        }
+    }
+
+    // Step 8 — Paint order: text first, highlights second, then connectors on top
+    pub fn render_diff_view(
+        &self,
+        ui: &mut egui::Ui,
+        left_lines: &[DisplayLine],
+        right_lines: &[DisplayLine],
+        change_blocks: &[ChangeBlock],
+        editor_rect: Rect,
+        line_height: f32,
+    ) {
+        let mut left_rects = Vec::new();
+        let mut right_rects = Vec::new();
+
+        // Create side-by-side layout
+        let left_editor_rect = Rect::from_min_size(
+            editor_rect.min,
+            egui::Vec2::new(editor_rect.width() / 2.0, editor_rect.height()),
+        );
+        let right_editor_rect = Rect::from_min_size(
+            Pos2::new(editor_rect.center().x, editor_rect.top()),
+            egui::Vec2::new(editor_rect.width() / 2.0, editor_rect.height()),
+        );
+
+        // First pass: render text content for left side
+        ui.allocate_ui_at_rect(left_editor_rect, |ui| {
+            for (i, line) in left_lines.iter().enumerate() {
+                let rect = self.line_renderer.render_line(ui, line, i, true);
+                left_rects.push(rect);
+            }
+        });
+
+        // First pass: render text content for right side
+        ui.allocate_ui_at_rect(right_editor_rect, |ui| {
+            for (i, line) in right_lines.iter().enumerate() {
+                let rect = self.line_renderer.render_line(ui, line, i, false);
+                right_rects.push(rect);
+            }
+        });
+
+        // Second pass: render highlights on top of text
+        for (i, _line) in left_lines.iter().enumerate() {
+            if let Some(rect) = left_rects.get(i) {
+                if self.should_highlight_line(i, change_blocks) {
+                    self.highlight_renderer.draw_highlight(ui, *rect);
+                }
+            }
+        }
+
+        for (i, _line) in right_lines.iter().enumerate() {
+            if let Some(rect) = right_rects.get(i) {
+                if self.should_highlight_line(i, change_blocks) {
+                    self.highlight_renderer.draw_highlight(ui, *rect);
+                }
+            }
+        }
+
+        // Third pass: render connectors on top of everything
+        self.connector_renderer
+            .render_connections(ui, change_blocks, &left_rects, &right_rects);
+    }
+
+    fn should_highlight_line(&self, line_index: usize, change_blocks: &[ChangeBlock]) -> bool {
+        change_blocks
+            .iter()
+            .any(|block| line_index >= block.start_line && line_index <= block.end_line)
+    }
+
+    pub fn update_theme(&mut self, theme: JetBrainsTheme) {
+        self.line_renderer.update_theme(theme.clone());
+        self.highlight_renderer.update_theme(theme.clone());
+        self.connector_renderer.update_theme(theme);
     }
 }
 

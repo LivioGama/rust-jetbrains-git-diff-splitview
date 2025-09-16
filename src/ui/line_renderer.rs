@@ -2,15 +2,20 @@
 use egui::{Color32, FontId, Pos2, Rect};
 
 use crate::models::line::{DisplayLine, LineType};
+use crate::rendering::HighlightRenderer;
 use crate::theme::JetBrainsTheme;
 
 pub struct LineRenderer {
     theme: JetBrainsTheme,
+    highlight_renderer: HighlightRenderer,
 }
 
 impl LineRenderer {
     pub fn new(theme: JetBrainsTheme) -> Self {
-        Self { theme }
+        Self {
+            highlight_renderer: HighlightRenderer::new(theme.clone()),
+            theme,
+        }
     }
 
     pub fn render_line(
@@ -38,15 +43,18 @@ impl LineRenderer {
         // JetBrains-style background colors for diff highlighting using theme
         let bg_color = self.theme.get_line_background(&line.line_type);
 
-        // Fill background for the entire line
-        if bg_color != Color32::TRANSPARENT {
+        // First draw JetBrains-style highlight if this is a changed line
+        if line.line_type != LineType::Context {
+            self.highlight_renderer.draw_highlight(ui, rect);
+        } else if bg_color != Color32::TRANSPARENT {
+            // Fill background for the entire line for context changes
             ui.painter().rect_filled(rect, 0.0, bg_color);
         }
 
         // Render line number with enhanced styling (only for non-empty lines)
         if let Some(line_num) = line.original_line_num {
             // Standardized positioning calculation for both panes
-            let line_num_pos = Pos2::new(rect.min.x + self.theme.gutter_width - 4.0, baseline_y);
+            let line_num_pos = Pos2::new(rect.min.x + 30.0, baseline_y);
 
             ui.painter().text(
                 line_num_pos,
@@ -66,7 +74,7 @@ impl LineRenderer {
 
         if !indicator.is_empty() {
             // Standardized positioning calculation for both panes
-            let indicator_pos = Pos2::new(rect.min.x + self.theme.gutter_width - 9.0, baseline_y);
+            let indicator_pos = Pos2::new(rect.min.x + self.theme.gutter_width - 5.0, baseline_y);
 
             let indicator_color = match line.line_type {
                 LineType::Deletion => self.theme.deletion_gutter,
@@ -96,7 +104,7 @@ impl LineRenderer {
             };
 
             // Standardized positioning calculation for both panes
-            let text_pos = Pos2::new(rect.min.x + content_start_x + 5.0, baseline_y);
+            let text_pos = Pos2::new(rect.min.x + content_start_x, baseline_y);
 
             ui.painter().text(
                 text_pos,
