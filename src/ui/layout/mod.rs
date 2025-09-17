@@ -2,7 +2,7 @@
 // UI Layout module for organizing the main application interface
 
 use eframe::egui;
-use egui::{FontId, Pos2, ScrollArea, Vec2};
+use egui::{Color32, FontId, Pos2, ScrollArea, Vec2};
 
 use crate::config::LayoutConfig;
 use crate::models::diff::MappingSegment;
@@ -179,9 +179,9 @@ impl LayoutManager {
                     let right_y_start = right_start_rect.top();
                     let right_y_end = right_end_rect.bottom();
 
-                    // Connector coordinates - extend into panes for seamless connection
-                    let x1 = gutter_x_start - 1.0; // Extend into left pane
-                    let x2 = gutter_x_end + 1.0; // Extend into right pane
+                    // Clean connector coordinates - use actual content boundaries for seamless connection
+                    let x1 = left_start_rect.max.x; // Exact right edge of left content
+                    let x2 = right_start_rect.min.x; // Exact left edge of right content
 
                     // Determine color based on change type
                     let left_line_type = old_lines.get(left_start).map(|l| &l.line_type);
@@ -193,19 +193,19 @@ impl LayoutManager {
                             Some(crate::models::line::LineType::Addition),
                         ) => {
                             // Modification: blue
-                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 100)
+                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
                         }
                         (Some(crate::models::line::LineType::Deletion), _) => {
                             // Deletion: red
-                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 100)
+                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
                         }
                         (_, Some(crate::models::line::LineType::Addition)) => {
                             // Addition: green
-                            egui::Color32::from_rgba_unmultiplied(76, 175, 80, 100)
+                            egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64)
                         }
                         _ => {
                             // Default: blue for context changes
-                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 100)
+                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
                         }
                     };
 
@@ -225,7 +225,7 @@ impl LayoutManager {
         }
     }
 
-    /// Draw a single connector using the rendering connector
+    /// JetBrains-quality connector using a custom triangle mesh to ensure perfect, artifact-free rendering.
     fn draw_connector(
         &self,
         ui: &mut egui::Ui,
@@ -237,79 +237,73 @@ impl LayoutManager {
         y2_end: f32,
         color: egui::Color32,
     ) {
-        use egui::Pos2;
+        use egui::{epaint::Vertex, epaint::Mesh, Pos2};
 
-        let cp1_x = x1 + (x2 - x1) * 0.4;
-        let cp2_x = x2 - (x2 - x1) * 0.4;
+        let segments = 32; // Use high resolution for a perfectly smooth curve.
+        let mut top_points = Vec::with_capacity(segments + 1);
+        let mut bottom_points = Vec::with_capacity(segments + 1);
 
-        // Adjust control points for better alignment with line blocks
-        let y_diff_top = y2_start - y1_start;
-        let cp1_y = y1_start + y_diff_top * 0.15;
-        let cp2_y = y2_start - y_diff_top * 0.15;
+        let control_point_offset = (x2 - x1) * 0.35;
 
-        let y_diff_bottom = y2_end - y1_end;
-        let cp1_y_bottom = y1_end + y_diff_bottom * 0.15;
-        let cp2_y_bottom = y2_end - y_diff_bottom * 0.15;
+        // 1. Generate the points for the top and bottom curves.
+        for i in 0..=segments {
+            let t = i as f32 / segments as f32;
 
-        // Create truly unified path without seams
-        let segments = 32;
-        let mut points = Vec::new();
+            // Top curve (left to right)
+            let top_start = Pos2::new(x1, y1_start);
+            let top_end = Pos2::new(x2, y2_start);
+            let top_ctrl1 = Pos2::new(top_start.x + control_point_offset, top_start.y);
+            let top_ctrl2 = Pos2::new(top_end.x - control_point_offset, top_end.y);
+            top_points.push(self.cubic_bezier(top_start, top_ctrl1, top_ctrl2, top_end, t));
 
-        // Generate smooth outline in one continuous path
-        // Top curve: left start to right start
+            // Bottom curve (left to right)
+            let bottom_start = Pos2::new(x1, y1_end);
+            let bottom_end = Pos2::new(x2, y2_end);
+            let bottom_ctrl1 = Pos2::new(bottom_start.x + control_point_offset, bottom_start.y);
+            let bottom_ctrl2 = Pos2::new(bottom_end.x - control_point_offset, bottom_end.y);
+            bottom_points.push(self.cubic_bezier(bottom_start, bottom_ctrl1, bottom_ctrl2, bottom_end, t));
+        }
+
+        // 2. Build the mesh using a triangle strip.
+        // This gives us direct control over rendering and avoids the PathShape artifacts.
+        let mut mesh = Mesh::default();
         for i in 0..segments {
-            let t = i as f32 / (segments - 1) as f32;
-            let point = self.evaluate_cubic_bezier(
-                Pos2::new(x1, y1_start),
-                Pos2::new(cp1_x, cp1_y),
-                Pos2::new(cp2_x, cp2_y),
-                Pos2::new(x2, y2_start),
-                t,
-            );
-            points.push(point);
+            let top_left = top_points[i];
+            let top_right = top_points[i + 1];
+            let bottom_left = bottom_points[i];
+            let bottom_right = bottom_points[i + 1];
+
+            // Create a quad from two triangles.
+            let top_left_idx = mesh.vertices.len() as u32;
+            mesh.vertices.push(Vertex { pos: top_left, uv: Pos2::ZERO, color });
+            let top_right_idx = mesh.vertices.len() as u32;
+            mesh.vertices.push(Vertex { pos: top_right, uv: Pos2::ZERO, color });
+            let bottom_left_idx = mesh.vertices.len() as u32;
+            mesh.vertices.push(Vertex { pos: bottom_left, uv: Pos2::ZERO, color });
+            let bottom_right_idx = mesh.vertices.len() as u32;
+            mesh.vertices.push(Vertex { pos: bottom_right, uv: Pos2::ZERO, color });
+
+            // Triangle 1: Top-left, top-right, bottom-left
+            mesh.add_triangle(top_left_idx, top_right_idx, bottom_left_idx);
+            // Triangle 2: Top-right, bottom-right, bottom-left
+            mesh.add_triangle(top_right_idx, bottom_right_idx, bottom_left_idx);
         }
 
-        // Right edge: right start to right end (smooth transition)
-        let right_segments = ((y2_end - y2_start).abs() / 2.0).max(2.0) as usize;
-        for i in 1..=right_segments {
-            let t = i as f32 / right_segments as f32;
-            let y = y2_start + (y2_end - y2_start) * t;
-            points.push(Pos2::new(x2, y));
+        // 3. Add the custom mesh to the painter.
+        ui.painter().add(egui::Shape::Mesh(mesh.into()));
+    }
+
+    /// Simple, reliable cubic bezier calculation.
+    fn cubic_bezier(&self, p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, t: f32) -> Pos2 {
+        let u = 1.0 - t;
+        let u2 = u * u;
+        let u3 = u2 * u;
+        let t2 = t * t;
+        let t3 = t2 * t;
+        Pos2 {
+            x: u3 * p0.x + 3.0 * u2 * t * p1.x + 3.0 * u * t2 * p2.x + t3 * p3.x,
+            y: u3 * p0.y + 3.0 * u2 * t * p1.y + 3.0 * u * t2 * p2.y + t3 * p3.y,
         }
-
-        // Bottom curve: right end to left end (reverse direction for smooth path)
-        for i in 0..segments {
-            let t = i as f32 / (segments - 1) as f32;
-            let point = self.evaluate_cubic_bezier(
-                Pos2::new(x2, y2_end),
-                Pos2::new(cp2_x, cp2_y_bottom),
-                Pos2::new(cp1_x, cp1_y_bottom),
-                Pos2::new(x1, y1_end),
-                t,
-            );
-            points.push(point);
-        }
-
-        // Left edge: left end to left start (smooth transition, excluding duplicate start point)
-        let left_segments = ((y1_start - y1_end).abs() / 2.0).max(2.0) as usize;
-        for i in 1..left_segments {
-            let t = i as f32 / left_segments as f32;
-            let y = y1_end + (y1_start - y1_end) * t;
-            points.push(Pos2::new(x1, y));
-        }
-
-        // Create single unified filled shape
-        let unified_color =
-            egui::Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 120);
-
-        let path_shape = egui::epaint::PathShape {
-            points,
-            closed: true,
-            fill: unified_color,
-            stroke: egui::epaint::PathStroke::NONE,
-        };
-
-        ui.painter().add(egui::Shape::Path(path_shape));
     }
 
     /// Generate points for a cubic Bezier curve
@@ -335,19 +329,6 @@ impl LayoutManager {
             points.push(Pos2::new(x, y));
         }
         points
-    }
-
-    fn evaluate_cubic_bezier(&self, p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, t: f32) -> Pos2 {
-        let u = 1.0 - t;
-        let u2 = u * u;
-        let u3 = u2 * u;
-        let t2 = t * t;
-        let t3 = t2 * t;
-
-        let x = u3 * p0.x + 3.0 * u2 * t * p1.x + 3.0 * u * t2 * p2.x + t3 * p3.x;
-        let y = u3 * p0.y + 3.0 * u2 * t * p1.y + 3.0 * u * t2 * p2.y + t3 * p3.y;
-
-        Pos2::new(x, y)
     }
 
     /// Render the left pane (original file)
@@ -442,13 +423,8 @@ impl LayoutManager {
         _pane_width: f32,
         _scroll_sync: &crate::sync::ScrollSync,
     ) {
-        // Create a frame with proper background color
-        let frame = egui::Frame::new()
-            .fill(theme.connector_column)
-            .inner_margin(egui::Margin::ZERO)
-            .outer_margin(egui::Margin::ZERO);
-
-        frame.show(ui, |ui| {
+        // No frame needed - background already handled by main layout
+        {
             ui.allocate_ui_with_layout(
                 Vec2::new(self.config.connector_column_width, total_height),
                 egui::Layout::top_down(egui::Align::Center),
@@ -461,9 +437,7 @@ impl LayoutManager {
                         )
                         .rect;
 
-                    // Fill the entire connector area with theme background
-                    ui.painter()
-                        .rect_filled(full_rect, 0.0, theme.connector_column);
+                    // Background already filled by main layout - no duplicate fill needed
 
                     // Find change hunks (contiguous blocks of any changes) on both sides
                     // This matches JetBrains behavior where connectors link corresponding hunks
@@ -522,9 +496,8 @@ impl LayoutManager {
                         connectors.push((left_start, left_end, right_start, right_end));
                     }
 
-                    // Create connector renderer and draw connectors between paired hunks
-                    let _connector_renderer =
-                        crate::rendering::ConnectorRenderer::new(theme.clone());
+                    // Connector rendering is handled by render_connectors() method only
+                    // No additional connector rendering needed here
                     let _line_height = 18.0;
                     // Account for header height (header + separator)
                     let header_height = theme.font_size * 1.1 + 20.0;
@@ -586,19 +559,19 @@ impl LayoutManager {
                                             Some(crate::models::line::LineType::Addition),
                                         ) => {
                                             // Modification: blue
-                                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 100)
+                                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
                                         }
                                         (Some(crate::models::line::LineType::Deletion), _) => {
                                             // Deletion: red
-                                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 100)
+                                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
                                         }
                                         (_, Some(crate::models::line::LineType::Addition)) => {
                                             // Addition: green
-                                            egui::Color32::from_rgba_unmultiplied(76, 175, 80, 100)
+                                            egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64)
                                         }
                                         _ => {
                                             // Default: blue for context changes
-                                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 100)
+                                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
                                         }
                                     };
 
@@ -614,7 +587,7 @@ impl LayoutManager {
                     }
                 },
             );
-        });
+        }
     }
 
     /// Render a pane header

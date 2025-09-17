@@ -397,18 +397,9 @@ impl ConnectorRenderer {
             points.push(egui::Pos2::new(x1, y));
         }
 
-        // Create single unified filled shape
-        let unified_color =
-            Color32::from_rgba_unmultiplied(_color.r(), _color.g(), _color.b(), 120);
-
-        let path_shape = PathShape {
-            points,
-            closed: true,
-            fill: unified_color,
-            stroke: egui::epaint::PathStroke::NONE,
-        };
-
-        canvas.painter().add(Shape::Path(path_shape));
+        // Do not render here – LayoutManager is the single source of connector drawing.
+        // We keep this function to compute and return the Bezier segments for any logic that needs them,
+        // but avoid adding shapes to prevent duplicate layered connectors.
 
         // Return the Bezier segments
         vec![

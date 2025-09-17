@@ -1,6 +1,5 @@
 // Connector rendering logic for diff viewer
-use egui::epaint::Shape;
-use egui::{Color32, Pos2, Rect, Stroke};
+use egui::{Color32, Pos2, Rect};
 
 use crate::models::line::LineType;
 use crate::theme::JetBrainsTheme;
@@ -16,48 +15,38 @@ impl ConnectorRenderer {
 
     pub fn draw_connection_lines(
         &self,
-        ui: &mut egui::Ui,
-        old_lines: &[crate::models::line::DisplayLine],
-        new_lines: &[crate::models::line::DisplayLine],
+        _ui: &mut egui::Ui,
+        _old_lines: &[crate::models::line::DisplayLine],
+        _new_lines: &[crate::models::line::DisplayLine],
     ) {
-        // Get stored rectangle positions
-        let left_rects: Option<Vec<Rect>> = ui
-            .ctx()
-            .memory_mut(|mem| mem.data.get_persisted("left_rects".into()));
-        let right_rects: Option<Vec<Rect>> = ui
-            .ctx()
-            .memory_mut(|mem| mem.data.get_persisted("right_rects".into()));
-
-        if let (Some(left_rects), Some(right_rects)) = (left_rects, right_rects) {
-            let painter = ui.painter();
-
-            // JetBrains approach: Draw connectors based on logical change relationships
-            self.draw_jetbrains_connectors(
-                painter,
-                old_lines,
-                new_lines,
-                &left_rects,
-                &right_rects,
-            );
-        }
+        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
+        // This prevents duplicate/overlapping connector rendering
     }
 
     fn draw_filled_connector_region(
         &self,
-        painter: &egui::Painter,
-        curve: &crate::models::ui::ConnectorCurve,
-        block_height: f32,
-        left_block_height: f32,
-        right_block_height: f32,
-        left_rects: &[Rect],
-        right_rects: &[Rect],
-        left_start: usize,
-        left_end: usize,
-        right_start: usize,
-        right_end: usize,
+        _painter: &egui::Painter,
+        _curve: &crate::models::ui::ConnectorCurve,
+        _block_height: f32,
+        _left_block_height: f32,
+        _right_block_height: f32,
+        _left_rects: &[Rect],
+        _right_rects: &[Rect],
+        _left_start: usize,
+        _left_end: usize,
+        _right_start: usize,
+        _right_end: usize,
     ) {
-        // Calculate semi-transparent fill color
-        let fill_color = curve.color.gamma_multiply(0.35); // 35% opacity for good visibility
+        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
+        // This prevents duplicate/overlapping connector rendering
+        /*
+        // Calculate semi-transparent fill color using consistent alpha method
+        let fill_color = Color32::from_rgba_unmultiplied(
+            curve.color.r(),
+            curve.color.g(), 
+            curve.color.b(),
+            64  // Consistent with theme alpha values
+        );
 
         // Use actual line rectangles to calculate the filled region bounds
         if left_start < left_rects.len() && right_start < right_rects.len() {
@@ -86,19 +75,23 @@ impl ConnectorRenderer {
                 fill_color,
             ));
         }
+        */
     }
 
     pub fn draw_change_block_connection(
         &self,
-        ui: &mut egui::Ui,
-        change_type: &str,
-        left_start: usize,
-        left_end: usize,
-        right_start: usize,
-        right_end: usize,
-        left_rects: &[Rect],
-        right_rects: &[Rect],
+        _ui: &mut egui::Ui,
+        _change_type: &str,
+        _left_start: usize,
+        _left_end: usize,
+        _right_start: usize,
+        _right_end: usize,
+        _left_rects: &[Rect],
+        _right_rects: &[Rect],
     ) {
+        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
+        // This prevents duplicate/overlapping connector rendering
+        /*
         if left_start >= left_rects.len() || right_start >= right_rects.len() {
             return;
         }
@@ -172,23 +165,31 @@ impl ConnectorRenderer {
             ));
         }
 
-        // Create and draw the filled shape without any stroke
-        let filled_shape =
-            Shape::convex_polygon(path_points, stroke_color, Stroke::new(0.0, stroke_color));
-        painter.add(filled_shape);
+        // Create and draw the filled shape as a single closed path (single layer, no stroke)
+        let path_shape = egui::epaint::PathShape {
+            points: path_points,
+            closed: true,
+            fill: stroke_color,
+            stroke: egui::epaint::PathStroke::NONE,
+        };
+        painter.add(egui::Shape::Path(path_shape));
 
-        // Using filled curves only - no additional stroke lines needed
+        // Using filled curves only - single layer
+        */
     }
 
     /// JetBrains-style connector rendering for independent line arrays
     fn draw_jetbrains_connectors(
         &self,
-        painter: &egui::Painter,
-        old_lines: &[crate::models::line::DisplayLine],
-        new_lines: &[crate::models::line::DisplayLine],
-        left_rects: &[egui::Rect],
-        right_rects: &[egui::Rect],
+        _painter: &egui::Painter,
+        _old_lines: &[crate::models::line::DisplayLine],
+        _new_lines: &[crate::models::line::DisplayLine],
+        _left_rects: &[egui::Rect],
+        _right_rects: &[egui::Rect],
     ) {
+        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
+        // This prevents duplicate/overlapping connector rendering
+        /*
         let config = crate::models::ui::ConnectorConfig::default();
 
         // Find deletion blocks on left side
@@ -238,17 +239,21 @@ impl ConnectorRenderer {
                 );
             }
         }
+        */
     }
 
     fn draw_single_connector(
         &self,
-        painter: &egui::Painter,
-        start_point: Pos2,
-        end_point: Pos2,
-        config: &crate::models::ui::ConnectorConfig,
-        color: Color32,
-        is_multi_line: bool,
+        _painter: &egui::Painter,
+        _start_point: Pos2,
+        _end_point: Pos2,
+        _config: &crate::models::ui::ConnectorConfig,
+        _color: Color32,
+        _is_multi_line: bool,
     ) {
+        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
+        // This prevents duplicate/overlapping connector rendering
+        /*
         let curve = crate::models::ui::ConnectorCurve::new(
             start_point,
             end_point,
@@ -284,8 +289,15 @@ impl ConnectorRenderer {
             connector_points.push(Pos2::new(point.x, point.y + thickness));
         }
 
-        let filled_shape = Shape::convex_polygon(connector_points, color, Stroke::new(0.0, color));
-        painter.add(filled_shape);
+        // Render as a single closed path (single layer), no stroke
+        let path_shape = egui::epaint::PathShape {
+            points: connector_points,
+            closed: true,
+            fill: color,
+            stroke: egui::epaint::PathStroke::NONE,
+        };
+        painter.add(egui::Shape::Path(path_shape));
+        */
     }
 
     /// Find change blocks of a specific type in a line array
