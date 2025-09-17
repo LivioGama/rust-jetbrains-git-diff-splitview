@@ -2,6 +2,7 @@
 // Rendering module for UI rendering logic
 
 use crate::models::*;
+use crate::syntax::SyntaxHighlighter;
 
 use crate::theme::JetBrainsTheme;
 use egui::epaint::{PathShape, Shape};
@@ -39,11 +40,15 @@ impl RenderContext {
 /// Line renderer for rendering individual lines
 pub struct LineRenderer {
     theme: JetBrainsTheme,
+    syntax_highlighter: SyntaxHighlighter,
 }
 
 impl LineRenderer {
     pub fn new(theme: JetBrainsTheme) -> Self {
-        Self { theme }
+        Self {
+            theme,
+            syntax_highlighter: SyntaxHighlighter::new(),
+        }
     }
 
     pub fn render_line(
@@ -127,20 +132,98 @@ impl LineRenderer {
     }
 
     fn render_line_content(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: Rect) {
-        let text_color = self.get_text_color(line);
         let content_rect = if self.theme.show_line_numbers {
             Rect::from_min_max(Pos2::new(rect.min.x + 45.0, rect.min.y), rect.max)
         } else {
             rect
         };
 
-        ui.painter().text(
-            content_rect.left_center(),
-            egui::Align2::LEFT_CENTER,
-            &line.content,
-            FontId::monospace(self.theme.font_size),
-            text_color,
-        );
+        // Get syntax-highlighted tokens
+        let tokens = self.syntax_highlighter.highlight_line(&line.content);
+
+        if tokens.is_empty() {
+            // Fallback to single-color text if no tokens
+            let text_color = self.get_text_color(line);
+            ui.painter().text(
+                content_rect.left_center(),
+                egui::Align2::LEFT_CENTER,
+                &line.content,
+                FontId::monospace(self.theme.font_size),
+                text_color,
+            );
+            return;
+        }
+
+        // Render each token with its appropriate color
+        let mut current_x = content_rect.min.x;
+        let y_center = content_rect.center().y;
+
+        for token in tokens {
+            let token_color = match line.line_type {
+                crate::models::line::LineType::Addition => {
+                    // For addition lines, blend syntax color with addition foreground
+                    self.blend_colors(
+                        self.syntax_highlighter
+                            .get_color_for_token(&token.token_type),
+                        self.theme.addition_foreground,
+                        0.7,
+                    )
+                }
+                crate::models::line::LineType::Deletion => {
+                    // For deletion lines, blend syntax color with deletion foreground
+                    self.blend_colors(
+                        self.syntax_highlighter
+                            .get_color_for_token(&token.token_type),
+                        self.theme.deletion_foreground,
+                        0.7,
+                    )
+                }
+                _ => {
+                    // For context lines, use pure syntax highlighting
+                    self.syntax_highlighter
+                        .get_color_for_token(&token.token_type)
+                }
+            };
+
+            ui.painter().text(
+                Pos2::new(current_x, y_center),
+                egui::Align2::LEFT_CENTER,
+                &token.text,
+                FontId::monospace(self.theme.font_size),
+                token_color,
+            );
+
+            // Calculate the width of the rendered text to position the next token
+            let text_width = ui
+                .painter()
+                .layout_no_wrap(
+                    token.text.clone(),
+                    FontId::monospace(self.theme.font_size),
+                    Color32::TRANSPARENT,
+                )
+                .size()
+                .x;
+
+            current_x += text_width;
+        }
+    }
+
+    fn blend_colors(
+        &self,
+        syntax_color: Color32,
+        line_color: Color32,
+        syntax_weight: f32,
+    ) -> Color32 {
+        let line_weight = 1.0 - syntax_weight;
+
+        let r =
+            (syntax_color.r() as f32 * syntax_weight + line_color.r() as f32 * line_weight) as u8;
+        let g =
+            (syntax_color.g() as f32 * syntax_weight + line_color.g() as f32 * line_weight) as u8;
+        let b =
+            (syntax_color.b() as f32 * syntax_weight + line_color.b() as f32 * line_weight) as u8;
+
+        Color32::from_rgb(r, g, b)
     }
 
     fn render_word_highlights(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: Rect) {
@@ -220,6 +303,7 @@ impl LineRenderer {
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {
         self.theme = theme;
+        // Syntax highlighter doesn't need theme updates as it uses fixed JetBrains colors
     }
 }
 

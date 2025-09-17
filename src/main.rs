@@ -17,6 +17,7 @@ mod navigation;
 mod rendering;
 mod state;
 mod sync;
+mod syntax;
 mod theme;
 mod ui;
 mod utils;

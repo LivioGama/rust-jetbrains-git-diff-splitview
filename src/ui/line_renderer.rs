@@ -3,17 +3,20 @@ use egui::{Color32, FontId, Pos2, Rect};
 
 use crate::models::line::{DisplayLine, LineType};
 use crate::rendering::HighlightRenderer;
+use crate::syntax::SyntaxHighlighter;
 use crate::theme::JetBrainsTheme;
 
 pub struct LineRenderer {
     theme: JetBrainsTheme,
     highlight_renderer: HighlightRenderer,
+    syntax_highlighter: SyntaxHighlighter,
 }
 
 impl LineRenderer {
     pub fn new(theme: JetBrainsTheme) -> Self {
         Self {
             highlight_renderer: HighlightRenderer::new(theme.clone()),
+            syntax_highlighter: SyntaxHighlighter::new(),
             theme,
         }
     }
@@ -69,54 +72,85 @@ impl LineRenderer {
             );
         }
 
-        // Render change indicator with improved positioning and colors
-        let indicator = match line.line_type {
-            LineType::Deletion => "−",
-            LineType::Addition => "+",
-            _ => "",
-        };
+        // Remove change indicators - no plus/minus signs displayed
 
-        if !indicator.is_empty() {
-            // Standardized positioning calculation for both panes
-            let indicator_pos = Pos2::new(rect.min.x + self.theme.gutter_width - 5.0, baseline_y);
-
-            let indicator_color = match line.line_type {
-                LineType::Deletion => self.theme.deletion_gutter,
-                LineType::Addition => self.theme.addition_gutter,
-                _ => self.theme.line_numbers,
-            };
-
-            ui.painter().text(
-                indicator_pos,
-                egui::Align2::CENTER_BOTTOM,
-                indicator,
-                FontId::new(self.theme.font_size * 0.9, egui::FontFamily::Monospace),
-                indicator_color,
-            );
-        }
-
-        // Render code content with enhanced syntax highlighting and word-level diffs
+        // Render code content with JetBrains syntax highlighting
         if !line.content.is_empty() {
             let content_start_x = self.theme.gutter_width;
-            let text_color = self.get_text_color(&line.content);
 
-            // Override text color for highlighted lines to ensure readability
-            let final_text_color = match line.line_type {
-                LineType::Deletion => self.theme.deletion_foreground,
-                LineType::Addition => self.theme.addition_foreground,
-                _ => text_color,
-            };
+            // Get syntax-highlighted tokens
+            let tokens = self.syntax_highlighter.highlight_line(&line.content);
 
-            // Standardized positioning calculation for both panes
-            let text_pos = Pos2::new(rect.min.x + content_start_x, baseline_y);
+            if tokens.is_empty() {
+                // Fallback to single-color text if no tokens
+                let text_color = self.get_text_color(&line.content);
+                let final_text_color = match line.line_type {
+                    LineType::Deletion => self.theme.deletion_foreground,
+                    LineType::Addition => self.theme.addition_foreground,
+                    _ => text_color,
+                };
 
-            ui.painter().text(
-                text_pos,
-                egui::Align2::LEFT_BOTTOM,
-                &line.content,
-                FontId::new(self.theme.font_size, egui::FontFamily::Monospace),
-                final_text_color,
-            );
+                let text_pos = Pos2::new(rect.min.x + content_start_x, baseline_y);
+                ui.painter().text(
+                    text_pos,
+                    egui::Align2::LEFT_BOTTOM,
+                    &line.content,
+                    FontId::new(self.theme.font_size, egui::FontFamily::Monospace),
+                    final_text_color,
+                );
+            } else {
+                // Render each token with its appropriate color
+                let mut current_x = rect.min.x + content_start_x;
+
+                for token in tokens {
+                    let token_color = match line.line_type {
+                        LineType::Addition => {
+                            // For addition lines, blend syntax color with addition foreground
+                            self.blend_colors(
+                                self.syntax_highlighter
+                                    .get_color_for_token(&token.token_type),
+                                self.theme.addition_foreground,
+                                0.7,
+                            )
+                        }
+                        LineType::Deletion => {
+                            // For deletion lines, blend syntax color with deletion foreground
+                            self.blend_colors(
+                                self.syntax_highlighter
+                                    .get_color_for_token(&token.token_type),
+                                self.theme.deletion_foreground,
+                                0.7,
+                            )
+                        }
+                        _ => {
+                            // For context lines, use pure syntax highlighting
+                            self.syntax_highlighter
+                                .get_color_for_token(&token.token_type)
+                        }
+                    };
+
+                    ui.painter().text(
+                        Pos2::new(current_x, baseline_y),
+                        egui::Align2::LEFT_BOTTOM,
+                        &token.text,
+                        FontId::new(self.theme.font_size, egui::FontFamily::Monospace),
+                        token_color,
+                    );
+
+                    // Calculate the width of the rendered text to position the next token
+                    let text_width = ui
+                        .painter()
+                        .layout_no_wrap(
+                            token.text.clone(),
+                            FontId::new(self.theme.font_size, egui::FontFamily::Monospace),
+                            Color32::TRANSPARENT,
+                        )
+                        .size()
+                        .x;
+
+                    current_x += text_width;
+                }
+            }
 
             // Render word-level highlights for modifications
             if line.line_type == LineType::Context && !line.word_highlights.is_empty() {
@@ -152,6 +186,24 @@ impl LineRenderer {
         }
 
         rect
+    }
+
+    fn blend_colors(
+        &self,
+        syntax_color: Color32,
+        line_color: Color32,
+        syntax_weight: f32,
+    ) -> Color32 {
+        let line_weight = 1.0 - syntax_weight;
+
+        let r =
+            (syntax_color.r() as f32 * syntax_weight + line_color.r() as f32 * line_weight) as u8;
+        let g =
+            (syntax_color.g() as f32 * syntax_weight + line_color.g() as f32 * line_weight) as u8;
+        let b =
+            (syntax_color.b() as f32 * syntax_weight + line_color.b() as f32 * line_weight) as u8;
+
+        Color32::from_rgb(r, g, b)
     }
 
     fn get_text_color(&self, content: &str) -> Color32 {
