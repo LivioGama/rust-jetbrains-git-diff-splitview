@@ -277,11 +277,11 @@ impl SyntaxHighlighter {
             if chars[current_pos] == '<' {
                 let start = current_pos;
                 let mut end = current_pos + 1;
-                let mut is_closing_tag = false;
+                let mut _is_closing_tag = false;
 
                 // Handle closing tags
                 if end < chars.len() && chars[end] == '/' {
-                    is_closing_tag = true;
+                    _is_closing_tag = true;
                     end += 1;
                 }
 

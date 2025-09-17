@@ -5,8 +5,7 @@ use crate::models::*;
 use crate::syntax::SyntaxHighlighter;
 
 use crate::theme::JetBrainsTheme;
-use egui::epaint::{PathShape, Shape};
-use egui::{Color32, FontId, Pos2, Rect, Stroke};
+use egui::{Color32, Pos2, Rect, Stroke};
 
 // Type aliases for the draw_connector function
 type Color = Color32;
@@ -59,7 +58,7 @@ impl LineRenderer {
         is_left: bool,
     ) -> Rect {
         let (rect, response) = ui.allocate_exact_size(
-            egui::vec2(ui.available_width(), self.theme.line_height),
+            egui::vec2(ui.available_width(), self.theme.line_height()),
             egui::Sense::hover(),
         );
 
@@ -126,7 +125,7 @@ impl LineRenderer {
             number_rect.center(),
             egui::Align2::CENTER_CENTER,
             number_text,
-            FontId::monospace(self.theme.font_size),
+            self.theme.buffer_font_id(),
             self.theme.line_numbers,
         );
     }
@@ -148,7 +147,7 @@ impl LineRenderer {
                 content_rect.left_center(),
                 egui::Align2::LEFT_CENTER,
                 &line.content,
-                FontId::monospace(self.theme.font_size),
+                self.theme.buffer_font_id(),
                 text_color,
             );
             return;
@@ -189,7 +188,7 @@ impl LineRenderer {
                 Pos2::new(current_x, y_center),
                 egui::Align2::LEFT_CENTER,
                 &token.text,
-                FontId::monospace(self.theme.font_size),
+                self.theme.buffer_font_id(),
                 token_color,
             );
 
@@ -198,7 +197,7 @@ impl LineRenderer {
                 .painter()
                 .layout_no_wrap(
                     token.text.clone(),
-                    FontId::monospace(self.theme.font_size),
+                    self.theme.buffer_font_id(),
                     Color32::TRANSPARENT,
                 )
                 .size()
@@ -257,7 +256,7 @@ impl LineRenderer {
                 .painter()
                 .layout_no_wrap(
                     text_before.to_string(),
-                    FontId::monospace(self.theme.font_size),
+                    self.theme.buffer_font_id(),
                     Color32::TRANSPARENT,
                 )
                 .size()
@@ -267,7 +266,7 @@ impl LineRenderer {
                 .painter()
                 .layout_no_wrap(
                     highlighted_text.to_string(),
-                    FontId::monospace(self.theme.font_size),
+                    self.theme.buffer_font_id(),
                     Color32::TRANSPARENT,
                 )
                 .size()
@@ -377,7 +376,7 @@ impl ConnectorRenderer {
         block: &ChangeBlock,
         x1: f32,
         x2: f32,
-        anchor: &crate::models::AnchorPoint,
+        _anchor: &crate::models::AnchorPoint,
         line_height: f32,
         top_y: f32,
     ) {
@@ -400,7 +399,7 @@ impl ConnectorRenderer {
         self.draw_connector(x1, y1_start, y1_end, x2, y2_start, y2_end, color, ui);
     }
 
-    fn get_connector_color(&self, block: &ChangeBlock) -> Color32 {
+    fn get_connector_color(&self, _block: &ChangeBlock) -> Color32 {
         // Use theme-based colors with transparency for connectors
         let base_color = self
             .theme
@@ -420,7 +419,7 @@ impl ConnectorRenderer {
         y2_start: f32,
         y2_end: f32,
         _color: Color,
-        canvas: &mut egui::Ui,
+        _canvas: &mut egui::Ui,
     ) -> Vec<(egui::Pos2, egui::Pos2, egui::Pos2, egui::Pos2)> {
         let cp1_x = x1 + (x2 - x1) * 0.35;
         let cp2_x = x2 - (x2 - x1) * 0.35;
@@ -573,7 +572,7 @@ impl JetBrainsRenderer {
         right_lines: &[DisplayLine],
         change_blocks: &[ChangeBlock],
         editor_rect: Rect,
-        line_height: f32,
+        _line_height: f32,
     ) {
         let mut left_rects = Vec::new();
         let mut right_rects = Vec::new();

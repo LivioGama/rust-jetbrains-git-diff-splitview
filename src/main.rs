@@ -25,6 +25,7 @@ mod utils;
 // Re-exports for convenience
 use actions::*;
 use app::*;
+use config::ConfigManager;
 use diff::*;
 use file_ops::FileOps;
 use git::{GitOps, GitResult};
@@ -32,6 +33,19 @@ use state::*;
 
 fn main() -> Result<(), eframe::Error> {
     println!("🚀 Starting JetBrains Diff Viewer - Modular Edition");
+
+    // Set up panic handler for better error reporting
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("💥 Application panicked: {}", panic_info);
+        if let Some(location) = panic_info.location() {
+            eprintln!(
+                "📍 Location: {}:{}:{}",
+                location.file(),
+                location.line(),
+                location.column()
+            );
+        }
+    }));
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -42,6 +56,8 @@ fn main() -> Result<(), eframe::Error> {
             .with_decorations(true)
             .with_window_level(egui::WindowLevel::Normal),
         centered: true,
+        // Add hardware acceleration settings for better compatibility
+        hardware_acceleration: eframe::HardwareAcceleration::Preferred,
         ..Default::default()
     };
 
@@ -49,6 +65,11 @@ fn main() -> Result<(), eframe::Error> {
     let git_ops = GitOps::new("/Users/livio/Documents/anbiti-apps/".to_string());
     let file_ops = FileOps::with_default_config();
     println!("✅ Git operations initialized successfully");
+
+    // Initialize configuration manager with Zed font specifications first
+    println!("🎨 Initializing font configuration...");
+    let config_manager = ConfigManager::new();
+    println!("✅ Configuration manager initialized successfully");
 
     // Try to read original file content from Git, with fallback
     println!("📖 Reading original file content from Git...");
@@ -137,7 +158,11 @@ fn main() -> Result<(), eframe::Error> {
     );
 
     // Build enhanced data structures for better functionality
-    let line_height = 18.0;
+    // Use Zed's golden ratio line height (1.618)
+    let line_height = config_manager
+        .get_config()
+        .fonts
+        .calculated_buffer_line_height();
     let anchors = sync::build_anchors_from_blocks(&change_blocks, line_height);
     let mapping_segments = sync::build_mapping_segments(&anchors);
 
@@ -165,11 +190,24 @@ fn main() -> Result<(), eframe::Error> {
     );
     println!("✅ Application initialization complete, creating window...");
 
+    // Apply font configuration before creating the application
+    println!("🎨 Setting up fonts and graphics...");
+
     eframe::run_native(
         "JetBrains Diff Viewer - Modular",
         options,
-        Box::new(move |_cc| {
+        Box::new(move |cc| {
             println!("✅ Window creation callback called successfully");
+
+            // Apply Zed font configuration to the egui context
+            println!("🔤 Applying font configuration...");
+            config_manager
+                .get_font_manager()
+                .apply_to_context(&cc.egui_ctx);
+            println!("✅ Font configuration applied successfully");
+
+            // Create the application
+            println!("✅ Application created successfully");
             Ok(Box::new(DiffViewerApp::new(state_manager, action_handler)))
         }),
     )

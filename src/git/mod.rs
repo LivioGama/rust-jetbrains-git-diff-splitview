@@ -36,7 +36,7 @@ impl GitOps {
                 success: output.status.success(),
                 stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             },
-            Err(e) => GitResult {
+            Err(_e) => GitResult {
                 success: false,
                 stdout: String::new(),
             },

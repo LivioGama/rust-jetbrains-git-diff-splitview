@@ -2,7 +2,7 @@
 // UI Layout module for organizing the main application interface
 
 use eframe::egui;
-use egui::{Color32, FontId, Pos2, ScrollArea, Vec2};
+use egui::{FontId, Pos2, ScrollArea, Vec2};
 
 use crate::config::LayoutConfig;
 use crate::models::diff::MappingSegment;
@@ -522,7 +522,7 @@ impl LayoutManager {
                     // No additional connector rendering needed here
                     let _line_height = 18.0;
                     // Account for header height (header + separator)
-                    let header_height = theme.font_size * 1.1 + 20.0;
+                    let header_height = theme.buffer_font_size() * 1.1 + 20.0;
 
                     // Get actual rendered rectangle positions from memory
                     let left_rects: Option<Vec<egui::Rect>> = ui
@@ -624,7 +624,7 @@ impl LayoutManager {
             ui.label(
                 egui::RichText::new(title)
                     .font(FontId::new(
-                        theme.font_size * 1.1,
+                        theme.ui_font_size() * 1.1,
                         egui::FontFamily::Proportional,
                     ))
                     .color(theme.foreground),

@@ -1,5 +1,5 @@
-// Line rendering logic for the diff viewer
-use egui::{Color32, FontId, Pos2, Rect};
+// Line rendering logic for the diff viewer with Zed IDE font specifications
+use egui::{Color32, FontFamily, FontId, Pos2, Rect};
 
 use crate::models::line::{DisplayLine, LineType};
 use crate::rendering::HighlightRenderer;
@@ -28,7 +28,7 @@ impl LineRenderer {
         _line_idx: usize,
         _is_left: bool,
     ) -> Rect {
-        let line_height = self.theme.line_height;
+        let line_height = self.theme.line_height();
         let available_width = ui.available_width();
 
         // Ensure consistent line allocation with no extra margins
@@ -40,8 +40,8 @@ impl LineRenderer {
         // Ensure no item spacing affects positioning
         ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
 
-        // Ensure identical baseline positioning for both panes
-        let baseline_y = rect.min.y + line_height - 3.0;
+        // Use Zed-style baseline calculation for proper text alignment
+        let baseline_y = rect.min.y + self.theme.baseline_offset();
 
         // Always fill the entire line background first to prevent white background
         ui.painter().rect_filled(rect, 0.0, self.theme.background);
@@ -67,7 +67,7 @@ impl LineRenderer {
                 line_num_pos,
                 egui::Align2::RIGHT_BOTTOM,
                 format!("{}", line_num),
-                FontId::new(self.theme.font_size * 0.85, egui::FontFamily::Monospace),
+                FontId::new(self.theme.buffer_font_size() * 0.85, FontFamily::Monospace),
                 self.theme.line_numbers,
             );
         }
@@ -95,7 +95,7 @@ impl LineRenderer {
                     text_pos,
                     egui::Align2::LEFT_BOTTOM,
                     &line.content,
-                    FontId::new(self.theme.font_size, egui::FontFamily::Monospace),
+                    self.theme.buffer_font_id(),
                     final_text_color,
                 );
             } else {
@@ -133,7 +133,7 @@ impl LineRenderer {
                         Pos2::new(current_x, baseline_y),
                         egui::Align2::LEFT_BOTTOM,
                         &token.text,
-                        FontId::new(self.theme.font_size, egui::FontFamily::Monospace),
+                        self.theme.buffer_font_id(),
                         token_color,
                     );
 
@@ -142,7 +142,7 @@ impl LineRenderer {
                         .painter()
                         .layout_no_wrap(
                             token.text.clone(),
-                            FontId::new(self.theme.font_size, egui::FontFamily::Monospace),
+                            self.theme.buffer_font_id(),
                             Color32::TRANSPARENT,
                         )
                         .size()
@@ -156,7 +156,7 @@ impl LineRenderer {
             if line.line_type == LineType::Context && !line.word_highlights.is_empty() {
                 for (start, end) in &line.word_highlights {
                     if *start < line.content.len() && *end <= line.content.len() && *start < *end {
-                        let char_width = 8.0; // Approximate character width
+                        let char_width = self.theme.char_width(); // Use Zed-calculated character width
                         let highlight_start_x = 60.0 + (*start as f32 * char_width);
                         let highlight_width = (*end - *start) as f32 * char_width;
 
