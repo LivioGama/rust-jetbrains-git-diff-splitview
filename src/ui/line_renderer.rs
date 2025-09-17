@@ -98,7 +98,7 @@ impl LineRenderer {
         // Render code content with enhanced syntax highlighting and word-level diffs
         if !line.content.is_empty() {
             let content_start_x = self.theme.gutter_width;
-            let text_color = self.get_text_color(&line.content, &line.line_type);
+            let text_color = self.get_text_color(&line.content);
 
             // Override text color for highlighted lines to ensure readability
             let final_text_color = match line.line_type {
@@ -136,8 +136,13 @@ impl LineRenderer {
                         );
 
                         // Word-level highlight with improved JetBrains colors
-                        // Use unified blue color for all word highlights
-                        let highlight_color = Color32::from_rgba_premultiplied(33, 150, 243, 64);
+                        // Use theme-based color for all word highlights
+                        let highlight_color = Color32::from_rgba_unmultiplied(
+                            self.theme.color_blue_500.r(),
+                            self.theme.color_blue_500.g(),
+                            self.theme.color_blue_500.b(),
+                            64,
+                        );
 
                         ui.painter()
                             .rect_filled(highlight_rect, 0.0, highlight_color);
@@ -149,7 +154,7 @@ impl LineRenderer {
         rect
     }
 
-    fn get_text_color(&self, content: &str, line_type: &LineType) -> Color32 {
+    fn get_text_color(&self, content: &str) -> Color32 {
         // Enhanced syntax highlighting with improved color detection
         let trimmed = content.trim();
 

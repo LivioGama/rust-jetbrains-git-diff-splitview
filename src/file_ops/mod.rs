@@ -73,56 +73,6 @@ impl FileOps {
             Err(e) => Err(format!("Failed to read file {}: {}", full_path, e)),
         }
     }
-
-    /// Get the git diff for the file
-    pub fn get_git_diff(&self) -> Result<String, String> {
-        let command = format!(
-            "cd {} && git diff HEAD -- {}",
-            self.config.git_repo_path, self.config.file_path
-        );
-
-        match Command::new("sh").arg("-c").arg(&command).output() {
-            Ok(output) => {
-                if output.status.success() {
-                    Ok(String::from_utf8_lossy(&output.stdout).to_string())
-                } else {
-                    // git diff returns non-zero exit code when there are differences,
-                    // but we still want the output
-                    Ok(String::from_utf8_lossy(&output.stdout).to_string())
-                }
-            }
-            Err(e) => Err(format!("Failed to execute git diff: {}", e)),
-        }
-    }
-
-    /// Read all file content and diff information
-    pub fn read_all_content(&self) -> Result<FileContent, String> {
-        let original_content = self
-            .read_original_content()
-            .unwrap_or_else(|_| "Error reading original file".to_string());
-
-        let current_content = self
-            .read_current_content()
-            .unwrap_or_else(|_| "Error reading current file".to_string());
-
-        let diff_text = self.get_git_diff().unwrap_or_else(|_| "".to_string());
-
-        Ok(FileContent {
-            original_content,
-            current_content,
-            diff_text,
-        })
-    }
-
-    /// Update the configuration
-    pub fn update_config(&mut self, config: FileConfig) {
-        self.config = config;
-    }
-
-    /// Get current configuration
-    pub fn get_config(&self) -> &FileConfig {
-        &self.config
-    }
 }
 
 #[cfg(test)]

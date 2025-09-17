@@ -17,23 +17,12 @@ pub enum NavigationAction {
 }
 
 /// Navigation state
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NavigationState {
     pub current_block_index: usize,
     pub total_blocks: usize,
     pub current_connector_index: usize,
     pub total_connectors: usize,
-}
-
-impl Default for NavigationState {
-    fn default() -> Self {
-        Self {
-            current_block_index: 0,
-            total_blocks: 0,
-            current_connector_index: 0,
-            total_connectors: 0,
-        }
-    }
 }
 
 /// Navigation handler for keyboard input

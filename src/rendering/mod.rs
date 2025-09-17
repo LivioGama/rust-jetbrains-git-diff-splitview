@@ -2,7 +2,7 @@
 // Rendering module for UI rendering logic
 
 use crate::models::*;
-use crate::sync;
+
 use crate::theme::JetBrainsTheme;
 use egui::epaint::{PathShape, Shape};
 use egui::{Color32, FontId, Pos2, Rect, Stroke};
@@ -78,7 +78,7 @@ impl LineRenderer {
             ui.painter().rect_stroke(
                 rect,
                 0.0,
-                Stroke::new(1.0, Color32::from_rgb(33, 150, 243)),
+                Stroke::new(1.0, self.theme.color_blue_500),
                 egui::StrokeKind::Middle,
             );
         }
@@ -240,8 +240,13 @@ impl HighlightRenderer {
         rect: Rect,
         _line_type: &crate::models::line::LineType,
     ) {
-        // Unified blue color for all highlights
-        let highlight_color = Color32::from_rgba_premultiplied(33, 150, 243, 64);
+        // Use theme-based highlight color with transparency
+        let highlight_color = Color32::from_rgba_unmultiplied(
+            self.theme.color_blue_500.r(),
+            self.theme.color_blue_500.g(),
+            self.theme.color_blue_500.b(),
+            64,
+        );
         ui.painter().rect_filled(rect, 0.0, highlight_color);
     }
 
@@ -273,11 +278,12 @@ impl ConnectorRenderer {
         let x1 = left_rects[0].max.x;
         let x2 = right_rects[0].min.x;
         for (block_idx, block) in change_blocks.iter().enumerate() {
-            let anchor = anchors
-                .iter()
-                .find(|a| a.block_id == format!("block_{}", block_idx))
-                .unwrap();
-            self.render_connection_block(ui, block, x1, x2, anchor, line_height, top_y);
+            // Skip sentinel anchors (first and last)
+            let anchor_idx = block_idx + 1;
+            if anchor_idx < anchors.len() - 1 {
+                let anchor = &anchors[anchor_idx];
+                self.render_connection_block(ui, block, x1, x2, anchor, line_height, top_y);
+            }
         }
     }
 
@@ -310,9 +316,12 @@ impl ConnectorRenderer {
         self.draw_connector(x1, y1_start, y1_end, x2, y2_start, y2_end, color, ui);
     }
 
-    fn get_connector_color(&self, _block: &ChangeBlock) -> Color32 {
-        // Unified blue color for all blocks and connectors - match highlight color exactly
-        Color32::from_rgba_premultiplied(33, 150, 243, 64)
+    fn get_connector_color(&self, block: &ChangeBlock) -> Color32 {
+        // Use theme-based colors with transparency for connectors
+        let base_color = self
+            .theme
+            .get_connector_color(&crate::models::line::LineType::Context);
+        Color32::from_rgba_unmultiplied(base_color.r(), base_color.g(), base_color.b(), 64)
     }
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {
@@ -326,7 +335,7 @@ impl ConnectorRenderer {
         x2: f32,
         y2_start: f32,
         y2_end: f32,
-        color: Color,
+        _color: Color,
         canvas: &mut egui::Ui,
     ) -> Vec<(egui::Pos2, egui::Pos2, egui::Pos2, egui::Pos2)> {
         let cp1_x = x1 + (x2 - x1) * 0.35;
@@ -341,44 +350,64 @@ impl ConnectorRenderer {
         let cp1_y_bottom = y1_end + y_diff_bottom * 0.2;
         let cp2_y_bottom = y2_end - y_diff_bottom * 0.2;
 
-        // Create the path by interpolating Bezier curves
+        // Create truly unified path without seams
+        let segments = 32;
         let mut points = Vec::new();
 
-        // Top curve
-        let top_curve_points = self.cubic_bezier_points(
-            egui::Pos2::new(x1, y1_start),
-            egui::Pos2::new(cp1_x, cp1_y),
-            egui::Pos2::new(cp2_x, cp2_y),
-            egui::Pos2::new(x2, y2_start),
-            20,
-        );
-        points.extend(top_curve_points);
+        // Generate smooth outline in one continuous path
+        // Top curve: left start to right start
+        for i in 0..segments {
+            let t = i as f32 / (segments - 1) as f32;
+            let point = self.evaluate_cubic_bezier(
+                egui::Pos2::new(x1, y1_start),
+                egui::Pos2::new(cp1_x, cp1_y),
+                egui::Pos2::new(cp2_x, cp2_y),
+                egui::Pos2::new(x2, y2_start),
+                t,
+            );
+            points.push(point);
+        }
 
-        // Right side
-        points.push(egui::Pos2::new(x2, y2_end));
+        // Right edge: right start to right end (smooth transition)
+        let right_segments = ((y2_end - y2_start).abs() / 2.0).max(2.0) as usize;
+        for i in 1..=right_segments {
+            let t = i as f32 / right_segments as f32;
+            let y = y2_start + (y2_end - y2_start) * t;
+            points.push(egui::Pos2::new(x2, y));
+        }
 
-        // Bottom curve
-        let bottom_curve_points = self.cubic_bezier_points(
-            egui::Pos2::new(x2, y2_end),
-            egui::Pos2::new(cp2_x, cp2_y_bottom),
-            egui::Pos2::new(cp1_x, cp1_y_bottom),
-            egui::Pos2::new(x1, y1_end),
-            20,
-        );
-        points.extend(bottom_curve_points);
+        // Bottom curve: right end to left end (reverse direction for smooth path)
+        for i in 0..segments {
+            let t = i as f32 / (segments - 1) as f32;
+            let point = self.evaluate_cubic_bezier(
+                egui::Pos2::new(x2, y2_end),
+                egui::Pos2::new(cp2_x, cp2_y_bottom),
+                egui::Pos2::new(cp1_x, cp1_y_bottom),
+                egui::Pos2::new(x1, y1_end),
+                t,
+            );
+            points.push(point);
+        }
 
-        // Close the path
-        points.push(egui::Pos2::new(x1, y1_start));
+        // Left edge: left end to left start (smooth transition, excluding duplicate start point)
+        let left_segments = ((y1_start - y1_end).abs() / 2.0).max(2.0) as usize;
+        for i in 1..left_segments {
+            let t = i as f32 / left_segments as f32;
+            let y = y1_end + (y1_start - y1_end) * t;
+            points.push(egui::Pos2::new(x1, y));
+        }
 
-        // Create the path shape with fill only (no stroke for seamless connection)
+        // Create single unified filled shape
+        let unified_color =
+            Color32::from_rgba_unmultiplied(_color.r(), _color.g(), _color.b(), 120);
+
         let path_shape = PathShape {
             points,
             closed: true,
-            fill: color,
+            fill: unified_color,
             stroke: egui::epaint::PathStroke::NONE,
         };
 
-        // Draw the connector
         canvas.painter().add(Shape::Path(path_shape));
 
         // Return the Bezier segments
@@ -423,6 +452,26 @@ impl ConnectorRenderer {
         }
         points
     }
+
+    fn evaluate_cubic_bezier(
+        &self,
+        p0: egui::Pos2,
+        p1: egui::Pos2,
+        p2: egui::Pos2,
+        p3: egui::Pos2,
+        t: f32,
+    ) -> egui::Pos2 {
+        let u = 1.0 - t;
+        let u2 = u * u;
+        let u3 = u2 * u;
+        let t2 = t * t;
+        let t3 = t2 * t;
+
+        let x = u3 * p0.x + 3.0 * u2 * t * p1.x + 3.0 * u * t2 * p2.x + t3 * p3.x;
+        let y = u3 * p0.y + 3.0 * u2 * t * p1.y + 3.0 * u * t2 * p2.y + t3 * p3.y;
+
+        egui::Pos2::new(x, y)
+    }
 }
 
 /// Enhanced rendering system for JetBrains-style diff viewer
@@ -451,8 +500,6 @@ impl JetBrainsRenderer {
         editor_rect: Rect,
         line_height: f32,
     ) {
-        let top_y = 50.0;
-        let anchors = sync::build_anchors_from_blocks(change_blocks, line_height);
         let mut left_rects = Vec::new();
         let mut right_rects = Vec::new();
 
@@ -500,17 +547,6 @@ impl JetBrainsRenderer {
                 }
             }
         }
-
-        // Third pass: render connectors on top of everything
-        self.connector_renderer.render_connections(
-            ui,
-            change_blocks,
-            &anchors,
-            &left_rects,
-            &right_rects,
-            line_height,
-            top_y,
-        );
     }
 
     fn should_highlight_line(&self, line_index: usize, change_blocks: &[ChangeBlock]) -> bool {

@@ -124,8 +124,6 @@ pub fn build_anchors_from_blocks(blocks: &[ChangeBlock], line_height: f32) -> Ve
     anchors.push(AnchorPoint {
         y_left_doc: 0.0,
         y_right_doc: 0.0,
-        weight: 1.0,
-        block_id: "sentinel_top".to_string(),
     });
 
     for (i, block) in blocks.iter().enumerate() {
@@ -140,8 +138,6 @@ pub fn build_anchors_from_blocks(blocks: &[ChangeBlock], line_height: f32) -> Ve
         anchors.push(AnchorPoint {
             y_left_doc: block_center_y,
             y_right_doc: block_center_y,
-            weight: max_lines,
-            block_id: format!("block_{}", i),
         });
     }
 
@@ -156,8 +152,6 @@ pub fn build_anchors_from_blocks(blocks: &[ChangeBlock], line_height: f32) -> Ve
     anchors.push(AnchorPoint {
         y_left_doc: last_y,
         y_right_doc: last_y,
-        weight: 1.0,
-        block_id: "sentinel_bottom".to_string(),
     });
 
     anchors

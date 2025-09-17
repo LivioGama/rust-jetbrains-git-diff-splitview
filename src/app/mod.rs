@@ -1,12 +1,9 @@
 // diffsplit/src/app/mod.rs
 use eframe::egui;
-use egui::{Color32, Rect};
 
 use crate::actions::*;
 use crate::config::*;
-use crate::models::*;
 use crate::navigation::*;
-use crate::rendering::JetBrainsRenderer;
 use crate::state::*;
 use crate::sync::*;
 use crate::theme::*;
@@ -22,7 +19,6 @@ pub struct DiffViewerApp {
     pub connector_renderer: ConnectorRenderer,
     pub navigation_handler: NavigationHandler,
     pub layout_manager: LayoutManager,
-    pub config_manager: ConfigManager,
 }
 
 impl DiffViewerApp {
@@ -41,7 +37,6 @@ impl DiffViewerApp {
             connector_renderer: ConnectorRenderer::new(theme),
             navigation_handler: NavigationHandler::new(),
             layout_manager: LayoutManager::new(config_manager.get_config().layout.clone()),
-            config_manager,
         }
     }
 

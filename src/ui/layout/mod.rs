@@ -33,7 +33,7 @@ impl LayoutManager {
         scroll_sync: &mut crate::sync::ScrollSync,
         theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
-        connector_renderer: &mut crate::ui::ConnectorRenderer,
+        _connector_renderer: &mut crate::ui::ConnectorRenderer,
         mapping_segments: &[MappingSegment],
     ) {
         let total_height = ui.available_height();
@@ -183,8 +183,31 @@ impl LayoutManager {
                     let x1 = gutter_x_start - 1.0; // Extend into left pane
                     let x2 = gutter_x_end + 1.0; // Extend into right pane
 
-                    // Use theme addition color (green with transparency)
-                    let color = egui::Color32::from_rgba_unmultiplied(76, 175, 80, 100);
+                    // Determine color based on change type
+                    let left_line_type = old_lines.get(left_start).map(|l| &l.line_type);
+                    let right_line_type = new_lines.get(right_start).map(|l| &l.line_type);
+
+                    let color = match (left_line_type, right_line_type) {
+                        (
+                            Some(crate::models::line::LineType::Deletion),
+                            Some(crate::models::line::LineType::Addition),
+                        ) => {
+                            // Modification: blue
+                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 100)
+                        }
+                        (Some(crate::models::line::LineType::Deletion), _) => {
+                            // Deletion: red
+                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 100)
+                        }
+                        (_, Some(crate::models::line::LineType::Addition)) => {
+                            // Addition: green
+                            egui::Color32::from_rgba_unmultiplied(76, 175, 80, 100)
+                        }
+                        _ => {
+                            // Default: blue for context changes
+                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 100)
+                        }
+                    };
 
                     // Draw the S-shaped connector linking the two hunks
                     self.draw_connector(
@@ -214,7 +237,7 @@ impl LayoutManager {
         y2_end: f32,
         color: egui::Color32,
     ) {
-        use egui::{epaint::PathShape, Pos2, Shape};
+        use egui::Pos2;
 
         let cp1_x = x1 + (x2 - x1) * 0.4;
         let cp2_x = x2 - (x2 - x1) * 0.4;
@@ -228,74 +251,65 @@ impl LayoutManager {
         let cp1_y_bottom = y1_end + y_diff_bottom * 0.15;
         let cp2_y_bottom = y2_end - y_diff_bottom * 0.15;
 
-        // Create the path by interpolating Bezier curves
+        // Create truly unified path without seams
+        let segments = 32;
         let mut points = Vec::new();
 
-        // Top curve
-        let top_curve_points = self.cubic_bezier_points(
-            Pos2::new(x1, y1_start),
-            Pos2::new(cp1_x, cp1_y),
-            Pos2::new(cp2_x, cp2_y),
-            Pos2::new(x2, y2_start),
-            20,
-        );
-        points.extend(top_curve_points);
+        // Generate smooth outline in one continuous path
+        // Top curve: left start to right start
+        for i in 0..segments {
+            let t = i as f32 / (segments - 1) as f32;
+            let point = self.evaluate_cubic_bezier(
+                Pos2::new(x1, y1_start),
+                Pos2::new(cp1_x, cp1_y),
+                Pos2::new(cp2_x, cp2_y),
+                Pos2::new(x2, y2_start),
+                t,
+            );
+            points.push(point);
+        }
 
-        // Right side
-        points.push(Pos2::new(x2, y2_end));
+        // Right edge: right start to right end (smooth transition)
+        let right_segments = ((y2_end - y2_start).abs() / 2.0).max(2.0) as usize;
+        for i in 1..=right_segments {
+            let t = i as f32 / right_segments as f32;
+            let y = y2_start + (y2_end - y2_start) * t;
+            points.push(Pos2::new(x2, y));
+        }
 
-        // Bottom curve
-        let bottom_curve_points = self.cubic_bezier_points(
-            Pos2::new(x2, y2_end),
-            Pos2::new(cp2_x, cp2_y_bottom),
-            Pos2::new(cp1_x, cp1_y_bottom),
-            Pos2::new(x1, y1_end),
-            20,
-        );
-        points.extend(bottom_curve_points);
+        // Bottom curve: right end to left end (reverse direction for smooth path)
+        for i in 0..segments {
+            let t = i as f32 / (segments - 1) as f32;
+            let point = self.evaluate_cubic_bezier(
+                Pos2::new(x2, y2_end),
+                Pos2::new(cp2_x, cp2_y_bottom),
+                Pos2::new(cp1_x, cp1_y_bottom),
+                Pos2::new(x1, y1_end),
+                t,
+            );
+            points.push(point);
+        }
 
-        // Close the path
-        points.push(Pos2::new(x1, y1_start));
+        // Left edge: left end to left start (smooth transition, excluding duplicate start point)
+        let left_segments = ((y1_start - y1_end).abs() / 2.0).max(2.0) as usize;
+        for i in 1..left_segments {
+            let t = i as f32 / left_segments as f32;
+            let y = y1_end + (y1_start - y1_end) * t;
+            points.push(Pos2::new(x1, y));
+        }
 
-        // Use mesh approach to completely eliminate any border artifacts
-        let mut mesh = egui::epaint::Mesh::default();
+        // Create single unified filled shape
+        let unified_color =
+            egui::Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 120);
 
-        // Make color slightly transparent for smooth blending
-        let fill_color = {
-            let [r, g, b, _a] = color.to_array();
-            egui::Color32::from_rgba_unmultiplied(r, g, b, 180)
+        let path_shape = egui::epaint::PathShape {
+            points,
+            closed: true,
+            fill: unified_color,
+            stroke: egui::epaint::PathStroke::NONE,
         };
 
-        // Create center point for triangulation
-        let center =
-            points.iter().fold(Pos2::ZERO, |acc, p| acc + p.to_vec2()) / points.len() as f32;
-
-        // Add center vertex
-        mesh.vertices.push(egui::epaint::Vertex {
-            pos: center,
-            uv: egui::epaint::WHITE_UV,
-            color: fill_color,
-        });
-
-        // Add edge vertices
-        for point in &points {
-            mesh.vertices.push(egui::epaint::Vertex {
-                pos: *point,
-                uv: egui::epaint::WHITE_UV,
-                color: fill_color,
-            });
-        }
-
-        // Create triangles from center to edges
-        for i in 0..points.len() {
-            let next_i = (i + 1) % points.len();
-            mesh.indices
-                .extend_from_slice(&[0, (i + 1) as u32, (next_i + 1) as u32]);
-        }
-
-        // Draw the mesh
-        ui.painter()
-            .add(egui::Shape::Mesh(std::sync::Arc::new(mesh)));
+        ui.painter().add(egui::Shape::Path(path_shape));
     }
 
     /// Generate points for a cubic Bezier curve
@@ -321,6 +335,19 @@ impl LayoutManager {
             points.push(Pos2::new(x, y));
         }
         points
+    }
+
+    fn evaluate_cubic_bezier(&self, p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, t: f32) -> Pos2 {
+        let u = 1.0 - t;
+        let u2 = u * u;
+        let u3 = u2 * u;
+        let t2 = t * t;
+        let t3 = t2 * t;
+
+        let x = u3 * p0.x + 3.0 * u2 * t * p1.x + 3.0 * u * t2 * p2.x + t3 * p3.x;
+        let y = u3 * p0.y + 3.0 * u2 * t * p1.y + 3.0 * u * t2 * p2.y + t3 * p3.y;
+
+        Pos2::new(x, y)
     }
 
     /// Render the left pane (original file)
@@ -409,11 +436,11 @@ impl LayoutManager {
         ui: &mut egui::Ui,
         old_lines: &[DisplayLine],
         new_lines: &[DisplayLine],
-        connector_renderer: &mut crate::ui::ConnectorRenderer,
+        _connector_renderer: &mut crate::ui::ConnectorRenderer,
         theme: &crate::theme::JetBrainsTheme,
         total_height: f32,
-        pane_width: f32,
-        scroll_sync: &crate::sync::ScrollSync,
+        _pane_width: f32,
+        _scroll_sync: &crate::sync::ScrollSync,
     ) {
         // Create a frame with proper background color
         let frame = egui::Frame::new()
@@ -496,9 +523,9 @@ impl LayoutManager {
                     }
 
                     // Create connector renderer and draw connectors between paired hunks
-                    let connector_renderer =
+                    let _connector_renderer =
                         crate::rendering::ConnectorRenderer::new(theme.clone());
-                    let line_height = 18.0;
+                    let _line_height = 18.0;
                     // Account for header height (header + separator)
                     let header_height = theme.font_size * 1.1 + 20.0;
 
@@ -531,6 +558,8 @@ impl LayoutManager {
                                 let y1_end = left_end_rect.bottom();
                                 let y2_start = right_start_rect.top();
                                 let y2_end = right_end_rect.bottom();
+                                let _x1 = full_rect.left() - 1.0; // Extend into left pane
+                                let _x2 = full_rect.right() + 1.0; // Extend into right pane
 
                                 // Only draw connector if at least part of it is visible in the gutter area
                                 let connector_top = y1_start.min(y2_start);
@@ -543,17 +572,42 @@ impl LayoutManager {
                                     && connector_top <= visible_area_bottom
                                 {
                                     // Connector coordinates - extend into panes for seamless connection
-                                    let x1 = full_rect.left() - 1.0; // Extend into left pane
-                                    let x2 = full_rect.right() + 1.0; // Extend into right pane
+                                    let _x1 = full_rect.left() - 1.0; // Extend into left pane
+                                    let _x2 = full_rect.right() + 1.0; // Extend into right pane
 
-                                    // Use theme addition color (green with transparency)
-                                    let color =
-                                        egui::Color32::from_rgba_unmultiplied(76, 175, 80, 100);
+                                    // Determine color based on change type
+                                    let left_line_type =
+                                        old_lines.get(left_start).map(|l| &l.line_type);
+                                    let right_line_type =
+                                        new_lines.get(right_start).map(|l| &l.line_type);
+                                    let _color = match (left_line_type, right_line_type) {
+                                        (
+                                            Some(crate::models::line::LineType::Deletion),
+                                            Some(crate::models::line::LineType::Addition),
+                                        ) => {
+                                            // Modification: blue
+                                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 100)
+                                        }
+                                        (Some(crate::models::line::LineType::Deletion), _) => {
+                                            // Deletion: red
+                                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 100)
+                                        }
+                                        (_, Some(crate::models::line::LineType::Addition)) => {
+                                            // Addition: green
+                                            egui::Color32::from_rgba_unmultiplied(76, 175, 80, 100)
+                                        }
+                                        _ => {
+                                            // Default: blue for context changes
+                                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 100)
+                                        }
+                                    };
 
                                     // Draw the S-shaped connector linking the two hunks
-                                    self.draw_connector(
-                                        ui, x1, y1_start, y1_end, x2, y2_start, y2_end, color,
-                                    );
+                                    // DISABLED: Draw the S-shaped connector linking the two hunks
+                                    // (Preventing duplicate connector rendering - main connectors handled elsewhere)
+                                    // self.draw_connector(
+                                    //     ui, x1, y1_start, y1_end, x2, y2_start, y2_end, color,
+                                    // );
                                 }
                             }
                         }
@@ -589,7 +643,7 @@ impl LayoutManager {
         ui: &mut egui::Ui,
         lines: &[DisplayLine],
         scroll_sync: &mut crate::sync::ScrollSync,
-        theme: &crate::theme::JetBrainsTheme,
+        _theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
         is_left: bool,
         scroll_id: &str,
@@ -659,16 +713,6 @@ impl LayoutManager {
                 scroll_output.state.offset.y,
             );
         });
-    }
-
-    /// Update layout configuration
-    pub fn update_config(&mut self, config: LayoutConfig) {
-        self.config = config;
-    }
-
-    /// Get current layout configuration
-    pub fn get_config(&self) -> &LayoutConfig {
-        &self.config
     }
 }
 

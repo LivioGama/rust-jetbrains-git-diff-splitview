@@ -1,5 +1,5 @@
 // Connector rendering logic for diff viewer
-use egui::epaint::{PathShape, Shape};
+use egui::epaint::Shape;
 use egui::{Color32, Pos2, Rect, Stroke};
 
 use crate::models::line::LineType;
@@ -105,8 +105,14 @@ impl ConnectorRenderer {
 
         let painter = ui.painter();
 
-        // Use unified blue color for all connectors
-        let stroke_color = Color32::from_rgb(33, 150, 243);
+        // Use theme-based color based on change type
+        let line_type = match change_type {
+            "addition" => crate::models::line::LineType::Addition,
+            "deletion" => crate::models::line::LineType::Deletion,
+            "modification" => crate::models::line::LineType::Context, // Modifications use Context with highlights
+            _ => crate::models::line::LineType::Context,
+        };
+        let stroke_color = self.theme.get_connector_color(&line_type);
 
         // Calculate the vertical span of the change blocks
         let left_top = left_rects[left_start].min.y;
@@ -206,8 +212,8 @@ impl ConnectorRenderer {
                     left_point,
                     right_point,
                     &config,
-                    Color32::from_rgb(33, 150, 243), // Unified blue
-                    end - start > 0,           // Multi-line
+                    self.theme.get_connector_color(&LineType::Deletion),
+                    end - start > 0, // Multi-line
                 );
             }
         }
@@ -227,8 +233,8 @@ impl ConnectorRenderer {
                     left_point,
                     right_point,
                     &config,
-                    Color32::from_rgb(33, 150, 243), // Unified blue
-                    end - start > 0,           // Multi-line
+                    self.theme.get_connector_color(&LineType::Addition),
+                    end - start > 0, // Multi-line
                 );
             }
         }

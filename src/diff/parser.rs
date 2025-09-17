@@ -38,7 +38,7 @@ impl JetBrainsDiff {
             Self::preprocess_lines(&lines1, &lines2);
 
         // Step 2: Core Patience diff algorithm
-        let mut operations = Self::patience_diff(&processed_lines1, &processed_lines2);
+        let operations = Self::patience_diff(&processed_lines1, &processed_lines2);
 
         // Step 3: Post-processing heuristics
         let mut operations = Self::group_nearby_changes(operations);
@@ -458,13 +458,7 @@ impl JetBrainsDiff {
                     end += 1;
                 }
 
-                blocks.push(ChangeBlock {
-                    line_type: LineType::Deletion,
-                    start_line: start,
-                    end_line: end,
-                    left_rects: Vec::new(),
-                    right_rects: Vec::new(),
-                });
+                blocks.push(ChangeBlock::new(start, end));
 
                 i = end + 1;
             } else {
@@ -486,17 +480,40 @@ impl JetBrainsDiff {
                     end += 1;
                 }
 
-                blocks.push(ChangeBlock {
-                    line_type: LineType::Addition,
-                    start_line: start,
-                    end_line: end,
-                    left_rects: Vec::new(),
-                    right_rects: Vec::new(),
-                });
+                blocks.push(ChangeBlock::new(start, end));
 
                 j = end + 1;
             } else {
                 j += 1;
+            }
+        }
+
+        // Find modification blocks (context lines with word highlights)
+        let mut k = 0;
+        while k < left_lines.len().min(right_lines.len()) {
+            if left_lines[k].line_type == LineType::Context
+                && right_lines[k].line_type == LineType::Context
+                && (!left_lines[k].word_highlights.is_empty()
+                    || !right_lines[k].word_highlights.is_empty())
+            {
+                let start = k;
+                let mut end = k;
+
+                // Find consecutive modifications
+                while end + 1 < left_lines.len().min(right_lines.len())
+                    && left_lines[end + 1].line_type == LineType::Context
+                    && right_lines[end + 1].line_type == LineType::Context
+                    && (!left_lines[end + 1].word_highlights.is_empty()
+                        || !right_lines[end + 1].word_highlights.is_empty())
+                {
+                    end += 1;
+                }
+
+                blocks.push(ChangeBlock::new(start, end));
+
+                k = end + 1;
+            } else {
+                k += 1;
             }
         }
 

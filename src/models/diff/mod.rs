@@ -1,29 +1,17 @@
 // diffsplit/src/models/diff/mod.rs
 // Diff-related data structures and types
 
-use egui::Rect;
-
 #[derive(Debug, Clone)]
 pub struct ChangeBlock {
-    pub line_type: crate::models::line::LineType,
     pub start_line: usize,
     pub end_line: usize,
-    pub left_rects: Vec<Rect>,
-    pub right_rects: Vec<Rect>,
 }
 
 impl ChangeBlock {
-    pub fn new(
-        line_type: crate::models::line::LineType,
-        start_line: usize,
-        end_line: usize,
-    ) -> Self {
+    pub fn new(start_line: usize, end_line: usize) -> Self {
         Self {
-            line_type,
             start_line,
             end_line,
-            left_rects: Vec::new(),
-            right_rects: Vec::new(),
         }
     }
 
@@ -44,23 +32,14 @@ impl ChangeBlock {
 pub struct AnchorPoint {
     pub y_left_doc: f32,
     pub y_right_doc: f32,
-    pub weight: f32,
-    pub block_id: String,
 }
 
 impl AnchorPoint {
-    pub fn new(y_left: f32, y_right: f32, block_id: String) -> Self {
+    pub fn new(y_left: f32, y_right: f32) -> Self {
         Self {
             y_left_doc: y_left,
             y_right_doc: y_right,
-            weight: 1.0,
-            block_id,
         }
-    }
-
-    pub fn with_weight(mut self, weight: f32) -> Self {
-        self.weight = weight;
-        self
     }
 }
 

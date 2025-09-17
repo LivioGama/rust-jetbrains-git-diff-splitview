@@ -24,7 +24,6 @@ mod utils;
 // Re-exports for convenience
 use actions::*;
 use app::*;
-use core::*;
 use diff::*;
 use file_ops::FileOps;
 use git::{GitOps, GitResult};
@@ -145,7 +144,7 @@ fn main() -> Result<(), eframe::Error> {
 
     // Initialize state manager and action handler
     let mut state_manager = StateManager::new();
-    let action_handler = ActionHandler::new(git_ops);
+    let action_handler = ActionHandler::new();
 
     // Initialize the application state
     state_manager.update_state(|state| {
