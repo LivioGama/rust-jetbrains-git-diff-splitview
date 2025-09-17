@@ -237,7 +237,7 @@ impl LayoutManager {
         y2_end: f32,
         color: egui::Color32,
     ) {
-        use egui::{epaint::Vertex, epaint::Mesh, Pos2};
+        use egui::{epaint::Mesh, epaint::Vertex, Pos2};
 
         let segments = 32; // Use high resolution for a perfectly smooth curve.
         let mut top_points = Vec::with_capacity(segments + 1);
@@ -261,7 +261,13 @@ impl LayoutManager {
             let bottom_end = Pos2::new(x2, y2_end);
             let bottom_ctrl1 = Pos2::new(bottom_start.x + control_point_offset, bottom_start.y);
             let bottom_ctrl2 = Pos2::new(bottom_end.x - control_point_offset, bottom_end.y);
-            bottom_points.push(self.cubic_bezier(bottom_start, bottom_ctrl1, bottom_ctrl2, bottom_end, t));
+            bottom_points.push(self.cubic_bezier(
+                bottom_start,
+                bottom_ctrl1,
+                bottom_ctrl2,
+                bottom_end,
+                t,
+            ));
         }
 
         // 2. Build the mesh using a triangle strip.
@@ -275,13 +281,29 @@ impl LayoutManager {
 
             // Create a quad from two triangles.
             let top_left_idx = mesh.vertices.len() as u32;
-            mesh.vertices.push(Vertex { pos: top_left, uv: Pos2::ZERO, color });
+            mesh.vertices.push(Vertex {
+                pos: top_left,
+                uv: Pos2::ZERO,
+                color,
+            });
             let top_right_idx = mesh.vertices.len() as u32;
-            mesh.vertices.push(Vertex { pos: top_right, uv: Pos2::ZERO, color });
+            mesh.vertices.push(Vertex {
+                pos: top_right,
+                uv: Pos2::ZERO,
+                color,
+            });
             let bottom_left_idx = mesh.vertices.len() as u32;
-            mesh.vertices.push(Vertex { pos: bottom_left, uv: Pos2::ZERO, color });
+            mesh.vertices.push(Vertex {
+                pos: bottom_left,
+                uv: Pos2::ZERO,
+                color,
+            });
             let bottom_right_idx = mesh.vertices.len() as u32;
-            mesh.vertices.push(Vertex { pos: bottom_right, uv: Pos2::ZERO, color });
+            mesh.vertices.push(Vertex {
+                pos: bottom_right,
+                uv: Pos2::ZERO,
+                color,
+            });
 
             // Triangle 1: Top-left, top-right, bottom-left
             mesh.add_triangle(top_left_idx, top_right_idx, bottom_left_idx);

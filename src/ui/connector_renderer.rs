@@ -43,7 +43,7 @@ impl ConnectorRenderer {
         // Calculate semi-transparent fill color using consistent alpha method
         let fill_color = Color32::from_rgba_unmultiplied(
             curve.color.r(),
-            curve.color.g(), 
+            curve.color.g(),
             curve.color.b(),
             64  // Consistent with theme alpha values
         );
