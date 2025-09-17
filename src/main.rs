@@ -17,6 +17,7 @@ mod navigation;
 mod rendering;
 mod state;
 mod sync;
+mod syntax;
 mod theme;
 mod ui;
 mod utils;
@@ -24,13 +25,30 @@ mod utils;
 // Re-exports for convenience
 use actions::*;
 use app::*;
+use config::ConfigManager;
+use diff::imara::compute_imara_diff_default;
+use diff::parser::create_complete_side_by_side_with_diff;
 use diff::*;
 use file_ops::FileOps;
 use git::{GitOps, GitResult};
+
 use state::*;
 
 fn main() -> Result<(), eframe::Error> {
     println!("🚀 Starting JetBrains Diff Viewer - Modular Edition");
+
+    // Set up panic handler for better error reporting
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("💥 Application panicked: {}", panic_info);
+        if let Some(location) = panic_info.location() {
+            eprintln!(
+                "📍 Location: {}:{}:{}",
+                location.file(),
+                location.line(),
+                location.column()
+            );
+        }
+    }));
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -41,13 +59,17 @@ fn main() -> Result<(), eframe::Error> {
             .with_decorations(true)
             .with_window_level(egui::WindowLevel::Normal),
         centered: true,
+        // Add hardware acceleration settings for better compatibility
+        hardware_acceleration: eframe::HardwareAcceleration::Preferred,
         ..Default::default()
     };
 
     println!("📊 Initializing Git operations and file operations...");
     let git_ops = GitOps::new("/Users/livio/Documents/anbiti-apps/".to_string());
     let file_ops = FileOps::with_default_config();
-    println!("✅ Git operations initialized successfully");
+
+    // Initialize configuration manager with Zed font specifications first
+    let config_manager = ConfigManager::new();
 
     // Try to read original file content from Git, with fallback
     println!("📖 Reading original file content from Git...");
@@ -123,20 +145,35 @@ fn main() -> Result<(), eframe::Error> {
         }
     };
 
-    // Create complete side-by-side display with diff highlighting
-    println!("⚙️ Processing diff...");
+    // Create side-by-side display with imara-diff semantic analysis
     let (old_lines, new_lines, change_blocks) =
         create_complete_side_by_side_with_diff(&original_content, &current_content, &diff_text);
 
-    println!(
-        "✅ Diff processed - old_lines: {}, new_lines: {}, change_blocks: {}",
-        old_lines.len(),
-        new_lines.len(),
-        change_blocks.len()
-    );
+    // Generate imara-diff analysis for semantic blocks
+    let imara_analysis = compute_imara_diff_default(&original_content, &current_content);
+
+    println!("🎯 Imara-diff semantic blocks:");
+    for (i, block) in imara_analysis.blocks.iter().enumerate() {
+        if block.is_change() {
+            println!(
+                "   📦 Block {}: left {}–{}, right {}–{}, op: {:?}, similarity: {:?}",
+                i + 1,
+                block.left_range.start,
+                block.left_range.end,
+                block.right_range.start,
+                block.right_range.end,
+                block.operation,
+                block.semantic_similarity
+            );
+        }
+    }
 
     // Build enhanced data structures for better functionality
-    let line_height = 18.0;
+    // Use Zed's golden ratio line height (1.618)
+    let line_height = config_manager
+        .get_config()
+        .fonts
+        .calculated_buffer_line_height();
     let anchors = sync::build_anchors_from_blocks(&change_blocks, line_height);
     let mapping_segments = sync::build_mapping_segments(&anchors);
 
@@ -152,6 +189,7 @@ fn main() -> Result<(), eframe::Error> {
         state.left_lines = old_lines.clone();
         state.right_lines = new_lines.clone();
         state.change_blocks = change_blocks;
+        state.imara_analysis = imara_analysis.clone();
         state.anchors = anchors;
         state.mapping_segments = mapping_segments;
     });
@@ -164,11 +202,17 @@ fn main() -> Result<(), eframe::Error> {
     );
     println!("✅ Application initialization complete, creating window...");
 
+    // Apply font configuration before creating the application
     eframe::run_native(
         "JetBrains Diff Viewer - Modular",
         options,
-        Box::new(move |_cc| {
-            println!("✅ Window creation callback called successfully");
+        Box::new(move |cc| {
+            // Apply Zed font configuration to the egui context
+            config_manager
+                .get_font_manager()
+                .apply_to_context(&cc.egui_ctx);
+
+            // Create the application
             Ok(Box::new(DiffViewerApp::new(state_manager, action_handler)))
         }),
     )

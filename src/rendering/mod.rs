@@ -2,10 +2,10 @@
 // Rendering module for UI rendering logic
 
 use crate::models::*;
+use crate::syntax::SyntaxHighlighter;
 
 use crate::theme::JetBrainsTheme;
-use egui::epaint::{PathShape, Shape};
-use egui::{Color32, FontId, Pos2, Rect, Stroke};
+use egui::{Color32, Pos2, Rect, Stroke};
 
 // Type aliases for the draw_connector function
 type Color = Color32;
@@ -39,11 +39,15 @@ impl RenderContext {
 /// Line renderer for rendering individual lines
 pub struct LineRenderer {
     theme: JetBrainsTheme,
+    syntax_highlighter: SyntaxHighlighter,
 }
 
 impl LineRenderer {
     pub fn new(theme: JetBrainsTheme) -> Self {
-        Self { theme }
+        Self {
+            theme,
+            syntax_highlighter: SyntaxHighlighter::new(),
+        }
     }
 
     pub fn render_line(
@@ -54,7 +58,7 @@ impl LineRenderer {
         is_left: bool,
     ) -> Rect {
         let (rect, response) = ui.allocate_exact_size(
-            egui::vec2(ui.available_width(), self.theme.line_height),
+            egui::vec2(ui.available_width(), self.theme.line_height()),
             egui::Sense::hover(),
         );
 
@@ -121,26 +125,104 @@ impl LineRenderer {
             number_rect.center(),
             egui::Align2::CENTER_CENTER,
             number_text,
-            FontId::monospace(self.theme.font_size),
+            self.theme.buffer_font_id(),
             self.theme.line_numbers,
         );
     }
 
     fn render_line_content(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: Rect) {
-        let text_color = self.get_text_color(line);
         let content_rect = if self.theme.show_line_numbers {
             Rect::from_min_max(Pos2::new(rect.min.x + 45.0, rect.min.y), rect.max)
         } else {
             rect
         };
 
-        ui.painter().text(
-            content_rect.left_center(),
-            egui::Align2::LEFT_CENTER,
-            &line.content,
-            FontId::monospace(self.theme.font_size),
-            text_color,
-        );
+        // Get syntax-highlighted tokens
+        let tokens = self.syntax_highlighter.highlight_line(&line.content);
+
+        if tokens.is_empty() {
+            // Fallback to single-color text if no tokens
+            let text_color = self.get_text_color(line);
+            ui.painter().text(
+                content_rect.left_center(),
+                egui::Align2::LEFT_CENTER,
+                &line.content,
+                self.theme.buffer_font_id(),
+                text_color,
+            );
+            return;
+        }
+
+        // Render each token with its appropriate color
+        let mut current_x = content_rect.min.x;
+        let y_center = content_rect.center().y;
+
+        for token in tokens {
+            let token_color = match line.line_type {
+                crate::models::line::LineType::Addition => {
+                    // For addition lines, blend syntax color with addition foreground
+                    self.blend_colors(
+                        self.syntax_highlighter
+                            .get_color_for_token(&token.token_type),
+                        self.theme.addition_foreground,
+                        0.7,
+                    )
+                }
+                crate::models::line::LineType::Deletion => {
+                    // For deletion lines, blend syntax color with deletion foreground
+                    self.blend_colors(
+                        self.syntax_highlighter
+                            .get_color_for_token(&token.token_type),
+                        self.theme.deletion_foreground,
+                        0.7,
+                    )
+                }
+                _ => {
+                    // For context lines, use pure syntax highlighting
+                    self.syntax_highlighter
+                        .get_color_for_token(&token.token_type)
+                }
+            };
+
+            ui.painter().text(
+                Pos2::new(current_x, y_center),
+                egui::Align2::LEFT_CENTER,
+                &token.text,
+                self.theme.buffer_font_id(),
+                token_color,
+            );
+
+            // Calculate the width of the rendered text to position the next token
+            let text_width = ui
+                .painter()
+                .layout_no_wrap(
+                    token.text.clone(),
+                    self.theme.buffer_font_id(),
+                    Color32::TRANSPARENT,
+                )
+                .size()
+                .x;
+
+            current_x += text_width;
+        }
+    }
+
+    fn blend_colors(
+        &self,
+        syntax_color: Color32,
+        line_color: Color32,
+        syntax_weight: f32,
+    ) -> Color32 {
+        let line_weight = 1.0 - syntax_weight;
+
+        let r =
+            (syntax_color.r() as f32 * syntax_weight + line_color.r() as f32 * line_weight) as u8;
+        let g =
+            (syntax_color.g() as f32 * syntax_weight + line_color.g() as f32 * line_weight) as u8;
+        let b =
+            (syntax_color.b() as f32 * syntax_weight + line_color.b() as f32 * line_weight) as u8;
+
+        Color32::from_rgb(r, g, b)
     }
 
     fn render_word_highlights(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: Rect) {
@@ -174,7 +256,7 @@ impl LineRenderer {
                 .painter()
                 .layout_no_wrap(
                     text_before.to_string(),
-                    FontId::monospace(self.theme.font_size),
+                    self.theme.buffer_font_id(),
                     Color32::TRANSPARENT,
                 )
                 .size()
@@ -184,7 +266,7 @@ impl LineRenderer {
                 .painter()
                 .layout_no_wrap(
                     highlighted_text.to_string(),
-                    FontId::monospace(self.theme.font_size),
+                    self.theme.buffer_font_id(),
                     Color32::TRANSPARENT,
                 )
                 .size()
@@ -220,6 +302,7 @@ impl LineRenderer {
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {
         self.theme = theme;
+        // Syntax highlighter doesn't need theme updates as it uses fixed JetBrains colors
     }
 }
 
@@ -233,21 +316,38 @@ impl HighlightRenderer {
         Self { theme }
     }
 
-    // Step 2 — Draw highlights
+    // Step 2 — Draw highlights based on line type
     pub fn draw_highlight(
         &self,
         ui: &mut egui::Ui,
         rect: Rect,
-        _line_type: &crate::models::line::LineType,
+        line_type: &crate::models::line::LineType,
     ) {
-        // Use theme-based highlight color with transparency
-        let highlight_color = Color32::from_rgba_unmultiplied(
-            self.theme.color_blue_500.r(),
-            self.theme.color_blue_500.g(),
-            self.theme.color_blue_500.b(),
-            64,
-        );
-        ui.painter().rect_filled(rect, 0.0, highlight_color);
+        // Use theme-based highlight color based on line type
+        let highlight_color = match line_type {
+            crate::models::line::LineType::Addition => {
+                // Green background for additions
+                self.theme.addition_background
+            }
+            crate::models::line::LineType::Deletion => {
+                // Gray/red background for deletions
+                self.theme.deletion_background
+            }
+            crate::models::line::LineType::Context => {
+                // Blue highlight for context lines with word-level changes
+                Color32::from_rgba_unmultiplied(
+                    self.theme.color_blue_500.r(),
+                    self.theme.color_blue_500.g(),
+                    self.theme.color_blue_500.b(),
+                    64,
+                )
+            }
+            _ => Color32::TRANSPARENT,
+        };
+
+        if highlight_color != Color32::TRANSPARENT {
+            ui.painter().rect_filled(rect, 0.0, highlight_color);
+        }
     }
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {
@@ -293,7 +393,7 @@ impl ConnectorRenderer {
         block: &ChangeBlock,
         x1: f32,
         x2: f32,
-        anchor: &crate::models::AnchorPoint,
+        _anchor: &crate::models::AnchorPoint,
         line_height: f32,
         top_y: f32,
     ) {
@@ -316,7 +416,7 @@ impl ConnectorRenderer {
         self.draw_connector(x1, y1_start, y1_end, x2, y2_start, y2_end, color, ui);
     }
 
-    fn get_connector_color(&self, block: &ChangeBlock) -> Color32 {
+    fn get_connector_color(&self, _block: &ChangeBlock) -> Color32 {
         // Use theme-based colors with transparency for connectors
         let base_color = self
             .theme
@@ -336,7 +436,7 @@ impl ConnectorRenderer {
         y2_start: f32,
         y2_end: f32,
         _color: Color,
-        canvas: &mut egui::Ui,
+        _canvas: &mut egui::Ui,
     ) -> Vec<(egui::Pos2, egui::Pos2, egui::Pos2, egui::Pos2)> {
         let cp1_x = x1 + (x2 - x1) * 0.35;
         let cp2_x = x2 - (x2 - x1) * 0.35;
@@ -489,7 +589,7 @@ impl JetBrainsRenderer {
         right_lines: &[DisplayLine],
         change_blocks: &[ChangeBlock],
         editor_rect: Rect,
-        line_height: f32,
+        _line_height: f32,
     ) {
         let mut left_rects = Vec::new();
         let mut right_rects = Vec::new();

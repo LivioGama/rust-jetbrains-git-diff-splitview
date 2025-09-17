@@ -1,25 +1,12 @@
-// JetBrains theme implementation
+// JetBrains theme implementation with Zed IDE font specifications
+use crate::config::{FontMetrics, LineHeightMode, ZedFontConfig, ZedFontManager, ZedSettings};
 use egui::{Color32, Stroke};
 
 #[derive(Debug, Clone)]
 pub struct JetBrainsTheme {
-    pub color_green_500: Color32,
-    pub color_red_500: Color32,
-    pub color_yellow_500: Color32,
     pub color_blue_500: Color32,
-    pub gray_50: Color32,
-    pub gray_100: Color32,
-    pub gray_200: Color32,
-    pub gray_300: Color32,
-    pub gray_400: Color32,
-    pub gray_500: Color32,
-    pub gray_600: Color32,
-    pub gray_700: Color32,
-    pub gray_800: Color32,
-    pub gray_900: Color32,
-    pub font_family: String,
-    pub font_size: f32,
-    pub line_height: f32,
+    pub font_config: ZedFontConfig,
+    pub editor_settings: ZedSettings,
     pub gutter_width: f32,
     pub connector_width: f32,
     pub addition_background: Color32,
@@ -41,44 +28,31 @@ pub struct JetBrainsTheme {
     pub gutter_background: Color32,
     pub gutter_border: Color32,
     pub connector_column: Color32,
-    pub scrollbar_track: Color32,
-    pub scrollbar_thumb: Color32,
     pub line_numbers: Color32,
-    pub line_numbers_active: Color32,
     pub show_line_numbers: bool,
 }
 
 impl JetBrainsTheme {
     pub fn dark_theme() -> Self {
+        let font_config =
+            ZedFontConfig::default().with_line_height_mode(LineHeightMode::Comfortable);
+        let editor_settings = ZedSettings::default();
+
         Self {
-            color_green_500: Color32::from_rgb(76, 175, 80),
-            color_red_500: Color32::from_rgb(244, 67, 54),
-            color_yellow_500: Color32::from_rgb(255, 193, 7),
             color_blue_500: Color32::from_rgb(33, 150, 243),
-            gray_50: Color32::from_rgb(250, 250, 250),
-            gray_100: Color32::from_rgb(245, 245, 245),
-            gray_200: Color32::from_rgb(238, 238, 238),
-            gray_300: Color32::from_rgb(224, 224, 224),
-            gray_400: Color32::from_rgb(189, 189, 189),
-            gray_500: Color32::from_rgb(158, 158, 158),
-            gray_600: Color32::from_rgb(117, 117, 117),
-            gray_700: Color32::from_rgb(97, 97, 97),
-            gray_800: Color32::from_rgb(66, 66, 66),
-            gray_900: Color32::from_rgb(33, 33, 33),
-            font_family: "JetBrains Mono".to_string(),
-            font_size: 13.0,
-            line_height: 18.0,
+            font_config,
+            editor_settings,
             gutter_width: 45.0,
             connector_width: 45.0,
-            addition_background: Color32::from_rgba_unmultiplied(76, 175, 80, 64),
+            addition_background: Color32::from_rgb(52, 85, 52),
             addition_foreground: Color32::from_rgb(129, 199, 132),
-            addition_gutter: Color32::from_rgb(76, 175, 80),
-            deletion_background: Color32::from_rgba_unmultiplied(244, 67, 54, 64),
+            addition_gutter: Color32::from_rgb(52, 85, 52),
+            deletion_background: Color32::from_rgba_unmultiplied(113, 113, 113, 64),
             deletion_foreground: Color32::from_rgb(239, 154, 154),
-            deletion_gutter: Color32::from_rgb(244, 67, 54),
-            modification_background: Color32::from_rgba_unmultiplied(33, 150, 243, 64),
+            deletion_gutter: Color32::from_rgb(113, 113, 113),
+            modification_background: Color32::from_rgb(50, 66, 98),
             modification_foreground: Color32::from_rgb(255, 249, 196),
-            modification_gutter: Color32::from_rgb(33, 150, 243),
+            modification_gutter: Color32::from_rgb(50, 66, 98),
             code_foreground: Color32::from_rgb(212, 212, 212),
             code_comment: Color32::from_rgb(106, 153, 85),
             code_keyword: Color32::from_rgb(86, 156, 214),
@@ -89,15 +63,16 @@ impl JetBrainsTheme {
             gutter_background: Color32::from_rgb(37, 37, 38),
             gutter_border: Color32::from_rgb(62, 62, 62),
             connector_column: Color32::from_rgb(45, 45, 45),
-            scrollbar_track: Color32::from_rgb(62, 62, 62),
-            scrollbar_thumb: Color32::from_rgb(100, 100, 100),
             line_numbers: Color32::from_rgb(153, 153, 153),
-            line_numbers_active: Color32::from_rgb(255, 255, 255),
             show_line_numbers: true,
         }
     }
 
     pub fn apply_to_context(&self, ctx: &egui::Context) {
+        // Apply Zed font configuration first
+        let font_manager = ZedFontManager::with_config(self.font_config.clone());
+        font_manager.apply_to_context(ctx);
+
         let mut style = (*ctx.style()).clone();
         style.visuals.dark_mode = self.background.r() < 128;
         style.visuals.window_fill = self.background;
@@ -107,6 +82,91 @@ impl JetBrainsTheme {
         style.visuals.selection.bg_fill = self.modification_background;
         style.visuals.selection.stroke = Stroke::new(1.0, self.modification_background);
         ctx.set_style(style);
+    }
+
+    /// Get Zed-style buffer font size
+    pub fn buffer_font_size(&self) -> f32 {
+        self.font_config.buffer_font_size
+    }
+
+    /// Get Zed-style UI font size
+    pub fn ui_font_size(&self) -> f32 {
+        self.font_config.ui_font_size
+    }
+
+    /// Get calculated line height using Zed's golden ratio
+    pub fn line_height(&self) -> f32 {
+        self.font_config.calculated_buffer_line_height()
+    }
+
+    /// Get buffer font ID for egui
+    pub fn buffer_font_id(&self) -> egui::FontId {
+        self.font_config.buffer_font_id()
+    }
+
+    /// Get UI font ID for egui
+    pub fn ui_font_id(&self) -> egui::FontId {
+        self.font_config.ui_font_id()
+    }
+
+    /// Check if ligatures are enabled
+    pub fn ligatures_enabled(&self) -> bool {
+        self.font_config.ligatures_enabled
+    }
+
+    /// Calculate baseline offset for text rendering
+    pub fn baseline_offset(&self) -> f32 {
+        FontMetrics::calculate_baseline_offset(self.line_height(), self.buffer_font_size())
+    }
+
+    /// Get character width approximation for monospace text
+    pub fn char_width(&self) -> f32 {
+        FontMetrics::approximate_char_width(self.buffer_font_size())
+    }
+
+    /// Get Zed editor settings
+    pub fn editor_settings(&self) -> &ZedSettings {
+        &self.editor_settings
+    }
+
+    /// Check if cursor should blink based on Zed settings
+    pub fn cursor_should_blink(&self) -> bool {
+        self.editor_settings.editor.cursor_blink
+    }
+
+    /// Get vertical scroll margin from Zed settings
+    pub fn vertical_scroll_margin(&self) -> u32 {
+        self.editor_settings.editor.vertical_scroll_margin
+    }
+
+    /// Get horizontal scroll margin from Zed settings
+    pub fn horizontal_scroll_margin(&self) -> u32 {
+        self.editor_settings.editor.horizontal_scroll_margin
+    }
+
+    /// Get scroll sensitivity from Zed settings
+    pub fn scroll_sensitivity(&self) -> f32 {
+        self.editor_settings.editor.scroll_sensitivity
+    }
+
+    /// Check if relative line numbers should be shown
+    pub fn show_relative_line_numbers(&self) -> bool {
+        self.editor_settings.editor.relative_line_numbers
+    }
+
+    /// Get tab size from Zed language settings
+    pub fn tab_size(&self) -> u32 {
+        self.editor_settings.language.tab_size
+    }
+
+    /// Check if hard tabs should be used
+    pub fn use_hard_tabs(&self) -> bool {
+        self.editor_settings.language.hard_tabs
+    }
+
+    /// Get preferred line length for wrapping
+    pub fn preferred_line_length(&self) -> u32 {
+        self.editor_settings.language.preferred_line_length
     }
 
     pub fn get_connector_color(&self, line_type: &crate::models::line::LineType) -> Color32 {
@@ -123,6 +183,56 @@ impl JetBrainsTheme {
             crate::models::line::LineType::Deletion => self.deletion_background,
             crate::models::line::LineType::Context => Color32::TRANSPARENT,
             crate::models::line::LineType::Empty => Color32::TRANSPARENT,
+        }
+    }
+
+    /// Create a safe default theme that won't panic
+    pub fn safe_default() -> Self {
+        // Use minimal, safe configuration with system fonts
+        let font_config = ZedFontConfig {
+            buffer_font_family: "monospace".to_string(),
+            buffer_font_size: 14.0,
+            buffer_font_weight: 400,
+            buffer_line_height: 14.0 * 1.3, // Standard line height
+            ui_font_family: "sans-serif".to_string(),
+            ui_font_size: 14.0,
+            ui_font_weight: 400,
+            terminal_font_family: "monospace".to_string(),
+            terminal_font_size: 14.0,
+            terminal_line_height: 14.0 * 1.3,
+            ligatures_enabled: false,
+            line_height_mode: LineHeightMode::Standard,
+        };
+
+        let editor_settings = ZedSettings::default();
+
+        Self {
+            color_blue_500: Color32::from_rgb(100, 150, 200),
+            font_config,
+            editor_settings,
+            gutter_width: 40.0,
+            connector_width: 40.0,
+            addition_background: Color32::from_rgb(40, 60, 40),
+            addition_foreground: Color32::from_rgb(100, 180, 100),
+            addition_gutter: Color32::from_rgb(40, 60, 40),
+            deletion_background: Color32::from_rgb(80, 80, 80),
+            deletion_foreground: Color32::from_rgb(200, 120, 120),
+            deletion_gutter: Color32::from_rgb(80, 80, 80),
+            modification_background: Color32::from_rgb(40, 50, 80),
+            modification_foreground: Color32::from_rgb(200, 200, 150),
+            modification_gutter: Color32::from_rgb(40, 50, 80),
+            code_foreground: Color32::from_rgb(200, 200, 200),
+            code_comment: Color32::from_rgb(100, 140, 80),
+            code_keyword: Color32::from_rgb(80, 140, 200),
+            code_string: Color32::from_rgb(200, 140, 100),
+            background: Color32::from_rgb(40, 40, 40),
+            foreground: Color32::from_rgb(200, 200, 200),
+            border: Color32::from_rgb(80, 80, 80),
+            gutter_background: Color32::from_rgb(50, 50, 50),
+            gutter_border: Color32::from_rgb(80, 80, 80),
+            connector_column: Color32::from_rgb(60, 60, 60),
+            line_numbers: Color32::from_rgb(140, 140, 140),
+            show_line_numbers: true,
         }
     }
 }

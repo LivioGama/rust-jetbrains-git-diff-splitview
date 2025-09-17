@@ -126,14 +126,14 @@ pub fn build_anchors_from_blocks(blocks: &[ChangeBlock], line_height: f32) -> Ve
         y_right_doc: 0.0,
     });
 
-    for (i, block) in blocks.iter().enumerate() {
+    for (_i, block) in blocks.iter().enumerate() {
         // Calculate block center using the unified line range
         let block_lines = (block.end_line - block.start_line + 1) as f32;
         let block_start_y = block.start_line as f32 * line_height;
         let block_center_y = block_start_y + (block_lines * line_height) / 2.0;
 
         // Use block size for weight calculation
-        let max_lines = block_lines;
+        let _max_lines = block_lines;
 
         anchors.push(AnchorPoint {
             y_left_doc: block_center_y,

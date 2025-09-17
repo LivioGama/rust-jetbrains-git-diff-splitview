@@ -150,7 +150,6 @@ impl Default for NavigationHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use eframe::egui;
 
     #[test]
     fn test_navigation_handler_creation() {

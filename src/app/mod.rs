@@ -19,14 +19,25 @@ pub struct DiffViewerApp {
     pub connector_renderer: ConnectorRenderer,
     pub navigation_handler: NavigationHandler,
     pub layout_manager: LayoutManager,
+    pub config_manager: ConfigManager,
 }
 
 impl DiffViewerApp {
     pub fn new(state_manager: StateManager, action_handler: ActionHandler) -> Self {
-        let theme = JetBrainsTheme::dark_theme();
-        let line_height = 18.0;
-        let viewport_height = 1000.0;
+        eprintln!("🎨 Creating DiffViewerApp...");
+
+        // Initialize configuration with error handling
         let config_manager = ConfigManager::new();
+        eprintln!("✅ Configuration manager created successfully");
+
+        // Initialize theme with safe defaults
+        let theme = JetBrainsTheme::dark_theme();
+        eprintln!("✅ Theme initialized successfully");
+
+        let line_height = theme.line_height(); // Use Zed's calculated line height
+        let viewport_height = 1000.0;
+
+        eprintln!("📏 Using line height: {}", line_height);
 
         Self {
             state_manager,
@@ -37,6 +48,7 @@ impl DiffViewerApp {
             connector_renderer: ConnectorRenderer::new(theme),
             navigation_handler: NavigationHandler::new(),
             layout_manager: LayoutManager::new(config_manager.get_config().layout.clone()),
+            config_manager,
         }
     }
 
@@ -57,7 +69,8 @@ impl DiffViewerApp {
 
 impl eframe::App for DiffViewerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Apply comprehensive JetBrains theme
+        // Apply Zed font configuration and JetBrains theme
+        self.config_manager.get_font_manager().apply_to_context(ctx);
         self.theme.apply_to_context(ctx);
 
         // Handle keyboard navigation
@@ -90,6 +103,7 @@ impl eframe::App for DiffViewerApp {
                 let left_lines = current_state.left_lines.clone();
                 let right_lines = current_state.right_lines.clone();
                 let mapping_segments = current_state.mapping_segments.clone();
+                let imara_analysis = current_state.imara_analysis.clone();
 
                 // Use the proper layout manager with improved connector rendering
                 self.layout_manager.render_layout(
@@ -101,6 +115,7 @@ impl eframe::App for DiffViewerApp {
                     &mut self.line_renderer,
                     &mut self.connector_renderer,
                     &mapping_segments,
+                    &imara_analysis,
                 );
             });
     }

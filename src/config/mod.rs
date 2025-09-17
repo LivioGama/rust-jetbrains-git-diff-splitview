@@ -1,30 +1,18 @@
 // diffsplit/src/config/mod.rs
 // Application configuration module
 
+pub mod editor_settings;
+pub mod fonts;
+
+pub use editor_settings::*;
+pub use fonts::*;
+
 /// Application configuration
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct AppConfig {
     pub layout: LayoutConfig,
-}
-
-/// Window configuration
-#[derive(Debug, Clone)]
-pub struct WindowConfig {}
-
-impl Default for WindowConfig {
-    fn default() -> Self {
-        Self {}
-    }
-}
-
-/// Theme configuration
-#[derive(Debug, Clone)]
-pub struct ThemeConfig {}
-
-impl Default for ThemeConfig {
-    fn default() -> Self {
-        Self {}
-    }
+    pub fonts: ZedFontConfig,
+    pub editor: ZedSettings,
 }
 
 /// Layout configuration
@@ -32,8 +20,6 @@ impl Default for ThemeConfig {
 pub struct LayoutConfig {
     pub connector_column_width: f32,
     pub pane_padding: f32,
-    pub header_height: f32,
-    pub scroll_area_padding: f32,
 }
 
 impl Default for LayoutConfig {
@@ -41,8 +27,16 @@ impl Default for LayoutConfig {
         Self {
             connector_column_width: 45.0,
             pane_padding: 10.0,
-            header_height: 30.0,
-            scroll_area_padding: 5.0,
+        }
+    }
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            layout: LayoutConfig::default(),
+            fonts: ZedFontConfig::default(),
+            editor: ZedSettings::default(),
         }
     }
 }
@@ -60,17 +54,26 @@ impl Default for NavigationConfig {
 /// Configuration manager
 pub struct ConfigManager {
     config: AppConfig,
+    font_manager: ZedFontManager,
 }
 
 impl ConfigManager {
     pub fn new() -> Self {
+        let config = AppConfig::default();
+        let font_manager = ZedFontManager::with_config(config.fonts.clone());
+
         Self {
-            config: AppConfig::default(),
+            config,
+            font_manager,
         }
     }
 
     pub fn get_config(&self) -> &AppConfig {
         &self.config
+    }
+
+    pub fn get_font_manager(&self) -> &ZedFontManager {
+        &self.font_manager
     }
 }
 
@@ -87,9 +90,12 @@ mod tests {
     #[test]
     fn test_app_config_default() {
         let config = AppConfig::default();
-        assert_eq!(config.window.title, "JetBrains Diff Viewer - Modular");
-        assert_eq!(config.window.initial_size, (1600.0, 1000.0));
-        assert!(config.theme.dark_mode);
+        assert_eq!(config.layout.connector_column_width, 45.0);
+        assert_eq!(config.fonts.buffer_font_size, 15.0);
+        assert_eq!(config.fonts.ui_font_size, 16.0);
+        assert_eq!(config.editor.language.tab_size, 4);
+        assert!(!config.editor.language.hard_tabs);
+        assert!(config.editor.editor.cursor_blink);
     }
 
     #[test]
@@ -97,15 +103,5 @@ mod tests {
         let manager = ConfigManager::new();
         let config = manager.get_config();
         assert_eq!(config.layout.connector_column_width, 45.0);
-    }
-
-    #[test]
-    fn test_config_update() {
-        let mut manager = ConfigManager::new();
-        manager.update_config(|config| {
-            config.window.title = "Updated Title".to_string();
-        });
-
-        assert_eq!(manager.get_config().window.title, "Updated Title");
     }
 }
