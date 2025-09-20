@@ -35,6 +35,7 @@ impl LayoutManager {
         line_renderer: &mut crate::ui::LineRenderer,
         _connector_renderer: &mut crate::ui::ConnectorRenderer,
         mapping_segments: &[MappingSegment],
+        imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
     ) {
         let total_height = ui.available_height();
         let total_width = ui.available_width();
@@ -83,7 +84,7 @@ impl LayoutManager {
         );
 
         // Now render connectors after both panes are rendered
-        self.render_connectors(ui, old_lines, new_lines, pane_width);
+        self.render_connectors(ui, old_lines, new_lines, pane_width, imara_analysis);
     }
 
     /// Render connectors between panes
@@ -93,6 +94,7 @@ impl LayoutManager {
         old_lines: &[DisplayLine],
         new_lines: &[DisplayLine],
         pane_width: f32,
+        imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
     ) {
         // Get stored rectangle positions
         let left_rects: Option<Vec<egui::Rect>> = ui
@@ -107,57 +109,24 @@ impl LayoutManager {
             let gutter_x_start = pane_width;
             let gutter_x_end = gutter_x_start + self.config.connector_column_width;
 
-            // Find change hunks (contiguous blocks of any changes) on both sides
-            let mut left_hunks = Vec::new();
-            let mut current_left: Option<(usize, usize)> = None;
-
-            for (i, line) in old_lines.iter().enumerate() {
-                if line.line_type != crate::models::line::LineType::Context {
-                    match current_left.as_mut() {
-                        Some((_, ref mut end)) => {
-                            *end = i;
-                        }
-                        None => {
-                            current_left = Some((i, i));
-                        }
-                    }
-                } else if let Some(hunk) = current_left.take() {
-                    left_hunks.push(hunk);
-                }
-            }
-            if let Some(hunk) = current_left.take() {
-                left_hunks.push(hunk);
-            }
-
-            let mut right_hunks = Vec::new();
-            let mut current_right: Option<(usize, usize)> = None;
-
-            for (i, line) in new_lines.iter().enumerate() {
-                if line.line_type != crate::models::line::LineType::Context {
-                    match current_right.as_mut() {
-                        Some((_, ref mut end)) => {
-                            *end = i;
-                        }
-                        None => {
-                            current_right = Some((i, i));
-                        }
-                    }
-                } else if let Some(hunk) = current_right.take() {
-                    right_hunks.push(hunk);
-                }
-            }
-            if let Some(hunk) = current_right.take() {
-                right_hunks.push(hunk);
-            }
-
-            // Pair up corresponding hunks
-            let hunk_pairs = std::cmp::min(left_hunks.len(), right_hunks.len());
+            // Use imara-diff semantic blocks for connector mapping
             let mut connectors = Vec::new();
 
-            for i in 0..hunk_pairs {
-                let (left_start, left_end) = left_hunks[i];
-                let (right_start, right_end) = right_hunks[i];
-                connectors.push((left_start, left_end, right_start, right_end));
+            for imara_block in &imara_analysis.blocks {
+                if !imara_block.is_change() {
+                    continue;
+                }
+
+                // Use the semantic ranges from imara-diff for connector mapping
+                let left_start = imara_block.left_range.start;
+                let left_end = imara_block.left_range.end.saturating_sub(1);
+                let right_start = imara_block.right_range.start;
+                let right_end = imara_block.right_range.end.saturating_sub(1);
+
+                // Only create connectors for blocks that have both left and right ranges
+                if !imara_block.left_range.is_empty() && !imara_block.right_range.is_empty() {
+                    connectors.push((left_start, left_end, right_start, right_end));
+                }
             }
 
             // Draw connectors for each hunk pair

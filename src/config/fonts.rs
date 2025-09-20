@@ -157,8 +157,6 @@ impl ZedFontManager {
         let font_definitions = FontDefinitions::default();
         let embedded_fonts_loaded = false;
 
-        eprintln!("✅ Font manager initialized - using egui defaults");
-
         Self {
             config,
             font_definitions,
@@ -170,9 +168,8 @@ impl ZedFontManager {
     pub fn apply_to_context(&self, ctx: &egui::Context) {
         // Apply fonts with error handling
         match self.try_apply_fonts(ctx) {
-            Ok(()) => eprintln!("✅ Fonts applied successfully"),
-            Err(e) => {
-                eprintln!("⚠️ Font application failed: {}, using system defaults", e);
+            Ok(()) => {}
+            Err(_) => {
                 self.apply_system_font_fallback(ctx);
             }
         }
@@ -238,7 +235,6 @@ impl ZedFontManager {
         );
 
         ctx.set_fonts(font_definitions);
-        eprintln!("✅ System font fallback applied");
     }
 
     /// Get font configuration
@@ -275,7 +271,6 @@ impl ZedFontManager {
         _embedded_fonts_loaded: bool,
     ) {
         // Use egui defaults, no customization
-        eprintln!("📝 Using egui default monospace fonts");
     }
 
     /// Setup proportional fonts with Zed-style fallbacks
@@ -285,7 +280,6 @@ impl ZedFontManager {
         _embedded_fonts_loaded: bool,
     ) {
         // Use egui defaults, no customization
-        eprintln!("📝 Using egui default proportional fonts");
     }
 
     /// Load embedded fonts with proper error handling
@@ -301,9 +295,8 @@ impl ZedFontManager {
                     .font_data
                     .insert("Lilex".to_owned(), FontData::from_static(lilex_data).into());
                 fonts_loaded += 1;
-                eprintln!("✅ Loaded Lilex font successfully");
             }
-            Err(e) => eprintln!("❌ Failed to load Lilex font: {}", e),
+            Err(_) => {}
         }
 
         // Try to load embedded IBM Plex Sans font
@@ -315,16 +308,11 @@ impl ZedFontManager {
                     FontData::from_static(plex_sans_data).into(),
                 );
                 fonts_loaded += 1;
-                eprintln!("✅ Loaded IBM Plex Sans font successfully");
             }
-            Err(e) => eprintln!("❌ Failed to load IBM Plex Sans font: {}", e),
+            Err(_) => {}
         }
 
         let success = fonts_loaded > 0;
-        eprintln!(
-            "📊 Embedded fonts loaded: {}/{} (success: {})",
-            fonts_loaded, total_fonts, success
-        );
         success
     }
 }
@@ -341,7 +329,6 @@ fn load_lilex_font() -> Result<&'static [u8], String> {
     if data.is_empty() {
         Err("Lilex font file is empty".to_string())
     } else {
-        eprintln!("📄 Lilex font loaded: {} bytes", data.len());
         Ok(data)
     }
 }
@@ -352,7 +339,6 @@ fn load_ibm_plex_sans_font() -> Result<&'static [u8], String> {
     if data.is_empty() {
         Err("IBM Plex Sans font file is empty".to_string())
     } else {
-        eprintln!("📄 IBM Plex Sans font loaded: {} bytes", data.len());
         Ok(data)
     }
 }

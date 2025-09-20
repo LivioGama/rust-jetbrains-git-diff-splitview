@@ -316,21 +316,38 @@ impl HighlightRenderer {
         Self { theme }
     }
 
-    // Step 2 — Draw highlights
+    // Step 2 — Draw highlights based on line type
     pub fn draw_highlight(
         &self,
         ui: &mut egui::Ui,
         rect: Rect,
-        _line_type: &crate::models::line::LineType,
+        line_type: &crate::models::line::LineType,
     ) {
-        // Use theme-based highlight color with transparency
-        let highlight_color = Color32::from_rgba_unmultiplied(
-            self.theme.color_blue_500.r(),
-            self.theme.color_blue_500.g(),
-            self.theme.color_blue_500.b(),
-            64,
-        );
-        ui.painter().rect_filled(rect, 0.0, highlight_color);
+        // Use theme-based highlight color based on line type
+        let highlight_color = match line_type {
+            crate::models::line::LineType::Addition => {
+                // Green background for additions
+                self.theme.addition_background
+            }
+            crate::models::line::LineType::Deletion => {
+                // Gray/red background for deletions
+                self.theme.deletion_background
+            }
+            crate::models::line::LineType::Context => {
+                // Blue highlight for context lines with word-level changes
+                Color32::from_rgba_unmultiplied(
+                    self.theme.color_blue_500.r(),
+                    self.theme.color_blue_500.g(),
+                    self.theme.color_blue_500.b(),
+                    64,
+                )
+            }
+            _ => Color32::TRANSPARENT,
+        };
+
+        if highlight_color != Color32::TRANSPARENT {
+            ui.painter().rect_filled(rect, 0.0, highlight_color);
+        }
     }
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {

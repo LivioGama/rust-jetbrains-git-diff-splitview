@@ -103,6 +103,7 @@ impl eframe::App for DiffViewerApp {
                 let left_lines = current_state.left_lines.clone();
                 let right_lines = current_state.right_lines.clone();
                 let mapping_segments = current_state.mapping_segments.clone();
+                let imara_analysis = current_state.imara_analysis.clone();
 
                 // Use the proper layout manager with improved connector rendering
                 self.layout_manager.render_layout(
@@ -114,6 +115,7 @@ impl eframe::App for DiffViewerApp {
                     &mut self.line_renderer,
                     &mut self.connector_renderer,
                     &mapping_segments,
+                    &imara_analysis,
                 );
             });
     }
