@@ -5,6 +5,7 @@ use eframe::egui;
 use egui::{FontId, Pos2, ScrollArea, Vec2};
 
 use crate::config::LayoutConfig;
+use crate::diff::imara::ImaraDiffBlock;
 use crate::models::diff::MappingSegment;
 use crate::models::line::DisplayLine;
 
@@ -107,7 +108,7 @@ impl LayoutManager {
         if let (Some(left_rects), Some(right_rects)) = (left_rects, right_rects) {
             // Calculate gutter position
             let gutter_x_start = pane_width;
-            let gutter_x_end = gutter_x_start + self.config.connector_column_width;
+            let _gutter_x_end = gutter_x_start + self.config.connector_column_width;
 
             // Use imara-diff semantic blocks for connector mapping
             let mut connectors = Vec::new();
@@ -126,6 +127,131 @@ impl LayoutManager {
                 // Only create connectors for blocks that have both left and right ranges
                 if !imara_block.left_range.is_empty() && !imara_block.right_range.is_empty() {
                     connectors.push((left_start, left_end, right_start, right_end));
+                }
+            }
+
+            // Draw crushed lines for pure insertion blocks (added lines with no left block)
+            for imara_block in &imara_analysis.blocks {
+                if imara_block.is_pure_insertion() && !imara_block.right_range.is_empty() {
+                    let right_start = imara_block.right_range.start;
+                    let right_end = imara_block.right_range.end.saturating_sub(1);
+
+                    if let (Some(right_start_rect), Some(right_end_rect)) =
+                        (right_rects.get(right_start), right_rects.get(right_end))
+                    {
+                        // Create a crushed line on the left side (same Y coordinates for top and bottom)
+                        let left_x_start = if left_rects.is_empty() {
+                            gutter_x_start - 100.0 // If no left content, start from a reasonable position
+                        } else {
+                            // Find the appropriate left position based on context
+                            let left_line_for_insertion = if right_start > 0 {
+                                // Try to find the last left line before this insertion
+                                left_rects.len().saturating_sub(1)
+                            } else {
+                                0
+                            };
+
+                            left_rects
+                                .get(
+                                    left_line_for_insertion.min(left_rects.len().saturating_sub(1)),
+                                )
+                                .map(|rect| rect.min.x)
+                                .unwrap_or(gutter_x_start - 100.0)
+                        };
+
+                        let left_x_end = gutter_x_start;
+                        let line_top_y = right_start_rect.top();
+                        let line_bottom_y = line_top_y + 2.0; // JetBrains-style 2px height
+
+                        // Use green color for additions with transparency
+                        let addition_color = egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64);
+
+                        // Draw a thin line on the left (2px height at the top)
+                        self.draw_connector(
+                            ui,
+                            left_x_start,
+                            line_top_y,
+                            line_bottom_y,
+                            left_x_end,
+                            line_top_y,
+                            line_bottom_y,
+                            addition_color,
+                        );
+
+                        // Draw connector from the thin line to the actual right block
+                        let right_x_start = right_start_rect.min.x;
+                        let right_top_y = right_start_rect.top();
+                        let right_bottom_y = right_end_rect.bottom();
+
+                        self.draw_connector(
+                            ui,
+                            left_x_end,
+                            line_top_y,
+                            line_bottom_y,
+                            right_x_start,
+                            right_top_y,
+                            right_bottom_y,
+                            addition_color,
+                        );
+                    }
+                }
+            }
+
+            // Draw crushed lines for pure deletion blocks (deleted lines with no right block)
+            for imara_block in &imara_analysis.blocks {
+                if imara_block.is_pure_deletion() && !imara_block.left_range.is_empty() {
+                    let left_start = imara_block.left_range.start;
+                    let left_end = imara_block.left_range.end.saturating_sub(1);
+
+                    if let (Some(left_start_rect), Some(left_end_rect)) =
+                        (left_rects.get(left_start), left_rects.get(left_end))
+                    {
+                        // Create a crushed line on the right side (same Y coordinates for top and bottom)
+                        let right_x_start = gutter_x_start + self.config.connector_column_width;
+                        let right_x_end = if right_rects.is_empty() {
+                            right_x_start + 100.0 // If no right content, extend to a reasonable position
+                        } else {
+                            // Find the appropriate right position based on context
+                            right_rects
+                                .get(0)
+                                .map(|rect| rect.max.x)
+                                .unwrap_or(right_x_start + 100.0)
+                        };
+
+                        let line_top_y = left_start_rect.top();
+                        let line_bottom_y = line_top_y + 2.0; // JetBrains-style 2px height
+
+                        // Use red color for deletions with transparency
+                        let deletion_color = egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64);
+
+                        // Draw connector from the left block to the thin line
+                        let left_x_end = left_start_rect.max.x;
+                        let left_top_y = left_start_rect.top();
+                        let left_bottom_y = left_end_rect.bottom();
+
+                        self.draw_connector(
+                            ui,
+                            left_x_end,
+                            left_top_y,
+                            left_bottom_y,
+                            right_x_start,
+                            line_top_y,
+                            line_bottom_y,
+                            deletion_color,
+                        );
+
+                        // Draw a thin line on the right (2px height at the top)
+                        self.draw_connector(
+                            ui,
+                            right_x_start,
+                            line_top_y,
+                            line_bottom_y,
+                            right_x_end,
+                            line_top_y,
+                            line_bottom_y,
+                            deletion_color,
+                        );
+                    }
                 }
             }
 
