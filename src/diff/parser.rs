@@ -1,6 +1,44 @@
 // Imara-diff based implementation for semantic diff analysis
 use crate::models::diff::ChangeBlock;
-use crate::models::line::{DisplayLine, LineType};
+use crate::models::line::{DisplayLine, HighlightType, LineType};
+use dissimilar;
+
+fn compute_word_highlights(
+    old_line: &str,
+    new_line: &str,
+) -> (
+    Vec<(usize, usize, HighlightType)>,
+    Vec<(usize, usize, HighlightType)>,
+) {
+    let chunks = dissimilar::diff(old_line, new_line);
+    let mut left_highlights = Vec::new();
+    let mut right_highlights = Vec::new();
+    let mut left_pos = 0;
+    let mut right_pos = 0;
+
+    for chunk in chunks {
+        match chunk {
+            dissimilar::Chunk::Equal(s) => {
+                let char_count = s.chars().count();
+                left_pos += char_count;
+                right_pos += char_count;
+            }
+            dissimilar::Chunk::Delete(s) => {
+                let start = left_pos;
+                let char_count = s.chars().count();
+                left_pos += char_count;
+                left_highlights.push((start, left_pos, HighlightType::Delete));
+            }
+            dissimilar::Chunk::Insert(s) => {
+                let start = right_pos;
+                let char_count = s.chars().count();
+                right_pos += char_count;
+                right_highlights.push((start, right_pos, HighlightType::Insert));
+            }
+        }
+    }
+    (left_highlights, right_highlights)
+}
 
 /// Main entry point using imara-diff semantic analysis with histogram algorithm
 pub fn create_complete_side_by_side_with_diff(
@@ -57,6 +95,25 @@ pub fn create_complete_side_by_side_with_diff(
                         if line_idx < right_display_lines.len() {
                             right_display_lines[line_idx].line_type = LineType::Modification;
                         }
+                    }
+                }
+
+                // Add word-level highlights for modified lines
+                for i in 0..imara_block
+                    .left_range
+                    .len()
+                    .min(imara_block.right_range.len())
+                {
+                    let left_idx = imara_block.left_range.start + i;
+                    let right_idx = imara_block.right_range.start + i;
+                    if left_idx < left_display_lines.len() && right_idx < right_display_lines.len()
+                    {
+                        let old_line = &old_lines[left_idx];
+                        let new_line = &new_lines[right_idx];
+                        let (left_highlights, right_highlights) =
+                            compute_word_highlights(old_line, new_line);
+                        left_display_lines[left_idx].word_highlights = left_highlights;
+                        right_display_lines[right_idx].word_highlights = right_highlights;
                     }
                 }
             }
