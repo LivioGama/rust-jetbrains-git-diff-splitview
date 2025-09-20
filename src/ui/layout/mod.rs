@@ -771,10 +771,9 @@ impl LayoutManager {
         let imara_blocks = &imara_analysis.blocks;
 
         let scroll_output = ScrollArea::vertical()
-            .id_source(scroll_id)
+            .id_salt(scroll_id)
             .auto_shrink([false, false])
             .max_height(available_height)
-            .min_scrolled_height(available_height)
             .scroll_offset(Vec2::new(0.0, scroll_offset))
             .show(ui, |ui| {
                 let mut line_rects = Vec::new();
@@ -887,17 +886,11 @@ impl LayoutManager {
                 });
             });
 
-        // Update scroll sync
+        // Update scroll sync without automatic synchronization
         if is_left {
             scroll_sync.set_left_scroll(scroll_output.state.offset.y);
-            // Synchronize right pane
-            scroll_sync
-                .synchronize_scrolls(|y| crate::sync::map_left_to_right(y, mapping_segments));
         } else {
             scroll_sync.set_right_scroll(scroll_output.state.offset.y);
-            // Synchronize left pane
-            scroll_sync
-                .synchronize_scrolls(|y| crate::sync::map_right_to_left(y, mapping_segments));
         }
 
         // Store scroll position
