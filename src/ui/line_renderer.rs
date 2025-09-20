@@ -87,6 +87,7 @@ impl LineRenderer {
                 let final_text_color = match line.line_type {
                     LineType::Deletion => self.theme.deletion_foreground,
                     LineType::Addition => self.theme.addition_foreground,
+                    LineType::Modification => self.theme.modification_foreground,
                     _ => text_color,
                 };
 
@@ -122,6 +123,15 @@ impl LineRenderer {
                                 0.7,
                             )
                         }
+                        LineType::Modification => {
+                            // For modification lines, blend syntax color with modification foreground
+                            self.blend_colors(
+                                self.syntax_highlighter
+                                    .get_color_for_token(&token.token_type),
+                                self.theme.modification_foreground,
+                                0.7,
+                            )
+                        }
                         _ => {
                             // For context lines, use pure syntax highlighting
                             self.syntax_highlighter
@@ -153,7 +163,9 @@ impl LineRenderer {
             }
 
             // Render word-level highlights for modifications
-            if line.line_type == LineType::Context && !line.word_highlights.is_empty() {
+            if (line.line_type == LineType::Context || line.line_type == LineType::Modification)
+                && !line.word_highlights.is_empty()
+            {
                 for (start, end) in &line.word_highlights {
                     if *start < line.content.len() && *end <= line.content.len() && *start < *end {
                         let char_width = self.theme.char_width(); // Use Zed-calculated character width

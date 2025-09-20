@@ -126,7 +126,13 @@ impl LayoutManager {
 
                 // Only create connectors for blocks that have both left and right ranges
                 if !imara_block.left_range.is_empty() && !imara_block.right_range.is_empty() {
-                    connectors.push((left_start, left_end, right_start, right_end));
+                    connectors.push((
+                        left_start,
+                        left_end,
+                        right_start,
+                        right_end,
+                        &imara_block.operation,
+                    ));
                 }
             }
 
@@ -256,7 +262,7 @@ impl LayoutManager {
             }
 
             // Draw connectors for each hunk pair
-            for (left_start, left_end, right_start, right_end) in connectors {
+            for (left_start, left_end, right_start, right_end, operation) in connectors {
                 if let (
                     Some(left_start_rect),
                     Some(left_end_rect),
@@ -278,29 +284,46 @@ impl LayoutManager {
                     let x1 = left_start_rect.max.x; // Exact right edge of left content
                     let x2 = right_start_rect.min.x; // Exact left edge of right content
 
-                    // Determine color based on change type
-                    let left_line_type = old_lines.get(left_start).map(|l| &l.line_type);
-                    let right_line_type = new_lines.get(right_start).map(|l| &l.line_type);
-
-                    let color = match (left_line_type, right_line_type) {
-                        (
-                            Some(crate::models::line::LineType::Deletion),
-                            Some(crate::models::line::LineType::Addition),
-                        ) => {
-                            // Modification: blue
+                    // Determine color based on Imara block operation (prioritize over line types)
+                    let color = match operation {
+                        crate::diff::imara::ImaraBlockOperation::Modify => {
+                            // All Modify blocks should be blue
                             egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
                         }
-                        (Some(crate::models::line::LineType::Deletion), _) => {
-                            // Deletion: red
-                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
-                        }
-                        (_, Some(crate::models::line::LineType::Addition)) => {
+                        crate::diff::imara::ImaraBlockOperation::Insert => {
                             // Addition: green
                             egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64)
                         }
+                        crate::diff::imara::ImaraBlockOperation::Delete => {
+                            // Deletion: red
+                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
+                        }
                         _ => {
-                            // Default: blue for context changes
-                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
+                            // Fallback to line type analysis for other cases
+                            let left_line_type = old_lines.get(left_start).map(|l| &l.line_type);
+                            let right_line_type = new_lines.get(right_start).map(|l| &l.line_type);
+
+                            match (left_line_type, right_line_type) {
+                                (
+                                    Some(crate::models::line::LineType::Deletion),
+                                    Some(crate::models::line::LineType::Addition),
+                                ) => {
+                                    // Modification: blue
+                                    egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
+                                }
+                                (Some(crate::models::line::LineType::Deletion), _) => {
+                                    // Deletion: red
+                                    egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
+                                }
+                                (_, Some(crate::models::line::LineType::Addition)) => {
+                                    // Addition: green
+                                    egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64)
+                                }
+                                _ => {
+                                    // Default: blue for context changes
+                                    egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
+                                }
+                            }
                         }
                     };
 

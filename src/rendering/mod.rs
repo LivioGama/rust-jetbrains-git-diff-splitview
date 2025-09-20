@@ -113,6 +113,7 @@ impl LineRenderer {
                     self.theme.modification_background
                 }
             }
+            LineType::Modification => self.theme.modification_background,
             LineType::Empty => Color32::TRANSPARENT,
         }
     }
@@ -177,8 +178,17 @@ impl LineRenderer {
                         0.7,
                     )
                 }
+                crate::models::line::LineType::Modification => {
+                    // For modification lines, blend syntax color with modification foreground
+                    self.blend_colors(
+                        self.syntax_highlighter
+                            .get_color_for_token(&token.token_type),
+                        self.theme.modification_foreground,
+                        0.7,
+                    )
+                }
                 _ => {
-                    // For context lines, use pure syntax highlighting
+                    // For context lines and others, use regular syntax color
                     self.syntax_highlighter
                         .get_color_for_token(&token.token_type)
                 }
@@ -296,6 +306,7 @@ impl LineRenderer {
                     self.theme.modification_foreground
                 }
             }
+            LineType::Modification => self.theme.modification_foreground,
             LineType::Empty => self.theme.foreground,
         }
     }
@@ -341,6 +352,10 @@ impl HighlightRenderer {
                     self.theme.color_blue_500.b(),
                     64,
                 )
+            }
+            crate::models::line::LineType::Modification => {
+                // Blue background for modifications
+                self.theme.modification_background
             }
             _ => Color32::TRANSPARENT,
         };

@@ -6,6 +6,7 @@ pub enum LineType {
     Context,
     Addition,
     Deletion,
+    Modification,
     Empty,
 }
 

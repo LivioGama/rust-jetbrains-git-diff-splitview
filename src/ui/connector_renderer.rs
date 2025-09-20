@@ -102,7 +102,7 @@ impl ConnectorRenderer {
         let line_type = match change_type {
             "addition" => crate::models::line::LineType::Addition,
             "deletion" => crate::models::line::LineType::Deletion,
-            "modification" => crate::models::line::LineType::Context, // Modifications use Context with highlights
+            "modification" => crate::models::line::LineType::Modification, // Modifications use new Modification type
             _ => crate::models::line::LineType::Context,
         };
         let stroke_color = self.theme.get_connector_color(&line_type);
