@@ -78,20 +78,81 @@ pub fn create_complete_side_by_side_with_diff(
             continue;
         }
 
-        // Mark left side lines (deletions)
-        if !imara_block.left_range.is_empty() {
-            for line_idx in imara_block.left_range.clone() {
-                if line_idx < left_display_lines.len() {
-                    left_display_lines[line_idx].line_type = LineType::Deletion;
+        // Handle different block operations
+        match imara_block.operation {
+            crate::diff::imara::ImaraBlockOperation::Modify => {
+                // For Modify blocks, use Modification type to get blue background
+                if !imara_block.left_range.is_empty() {
+                    for line_idx in imara_block.left_range.clone() {
+                        if line_idx < left_display_lines.len() {
+                            left_display_lines[line_idx].line_type = LineType::Modification;
+                        }
+                    }
+                }
+
+                if !imara_block.right_range.is_empty() {
+                    for line_idx in imara_block.right_range.clone() {
+                        if line_idx < right_display_lines.len() {
+                            right_display_lines[line_idx].line_type = LineType::Modification;
+                        }
+                    }
+                }
+
+                // Add word-level highlights for modified lines
+                for i in 0..imara_block
+                    .left_range
+                    .len()
+                    .min(imara_block.right_range.len())
+                {
+                    let left_idx = imara_block.left_range.start + i;
+                    let right_idx = imara_block.right_range.start + i;
+                    if left_idx < left_display_lines.len() && right_idx < right_display_lines.len()
+                    {
+                        let old_line = &old_lines[left_idx];
+                        let new_line = &new_lines[right_idx];
+                        let (left_highlights, right_highlights) =
+                            compute_word_highlights(old_line, new_line);
+                        left_display_lines[left_idx].word_highlights = left_highlights;
+                        right_display_lines[right_idx].word_highlights = right_highlights;
+                    }
                 }
             }
-        }
+            crate::diff::imara::ImaraBlockOperation::Insert => {
+                // Pure insertion: mark right side as Addition
+                if !imara_block.right_range.is_empty() {
+                    for line_idx in imara_block.right_range.clone() {
+                        if line_idx < right_display_lines.len() {
+                            right_display_lines[line_idx].line_type = LineType::Addition;
+                        }
+                    }
+                }
+            }
+            crate::diff::imara::ImaraBlockOperation::Delete => {
+                // Pure deletion: mark left side as Deletion
+                if !imara_block.left_range.is_empty() {
+                    for line_idx in imara_block.left_range.clone() {
+                        if line_idx < left_display_lines.len() {
+                            left_display_lines[line_idx].line_type = LineType::Deletion;
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Fallback to original behavior for other operations
+                if !imara_block.left_range.is_empty() {
+                    for line_idx in imara_block.left_range.clone() {
+                        if line_idx < left_display_lines.len() {
+                            left_display_lines[line_idx].line_type = LineType::Deletion;
+                        }
+                    }
+                }
 
-        // Mark right side lines (additions)
-        if !imara_block.right_range.is_empty() {
-            for line_idx in imara_block.right_range.clone() {
-                if line_idx < right_display_lines.len() {
-                    right_display_lines[line_idx].line_type = LineType::Addition;
+                if !imara_block.right_range.is_empty() {
+                    for line_idx in imara_block.right_range.clone() {
+                        if line_idx < right_display_lines.len() {
+                            right_display_lines[line_idx].line_type = LineType::Addition;
+                        }
+                    }
                 }
             }
         }
