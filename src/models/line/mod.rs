@@ -2,10 +2,17 @@
 // Line-related data structures and types
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum HighlightType {
+    Insert,
+    Delete,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum LineType {
     Context,
     Addition,
     Deletion,
+    Modification,
     Empty,
 }
 
@@ -14,7 +21,7 @@ pub struct DisplayLine {
     pub content: String,
     pub line_type: LineType,
     pub original_line_num: Option<usize>,
-    pub word_highlights: Vec<(usize, usize)>,
+    pub word_highlights: Vec<(usize, usize, HighlightType)>,
 }
 
 impl DisplayLine {
@@ -32,7 +39,7 @@ impl DisplayLine {
         self
     }
 
-    pub fn with_word_highlights(mut self, highlights: Vec<(usize, usize)>) -> Self {
+    pub fn with_word_highlights(mut self, highlights: Vec<(usize, usize, HighlightType)>) -> Self {
         self.word_highlights = highlights;
         self
     }
