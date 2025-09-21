@@ -181,11 +181,9 @@ impl ConnectorRenderer {
     /// JetBrains-style connector rendering for independent line arrays
     fn draw_jetbrains_connectors(
         &self,
-        _painter: &egui::Painter,
+        _ui: &mut egui::Ui,
         _old_lines: &[crate::models::line::DisplayLine],
         _new_lines: &[crate::models::line::DisplayLine],
-        _left_rects: &[egui::Rect],
-        _right_rects: &[egui::Rect],
     ) {
         // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
         // This prevents duplicate/overlapping connector rendering
