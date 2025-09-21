@@ -58,6 +58,7 @@ impl LayoutManager {
                     pane_width,
                     total_height,
                     mapping_segments,
+                    imara_analysis,
                 );
 
                 // Middle gutter background (connectors will be drawn later)
@@ -80,6 +81,7 @@ impl LayoutManager {
                     pane_width,
                     total_height,
                     mapping_segments,
+                    imara_analysis,
                 );
             },
         );
@@ -126,137 +128,117 @@ impl LayoutManager {
 
                 // Only create connectors for blocks that have both left and right ranges
                 if !imara_block.left_range.is_empty() && !imara_block.right_range.is_empty() {
-                    connectors.push((left_start, left_end, right_start, right_end));
+                    connectors.push((
+                        left_start,
+                        left_end,
+                        right_start,
+                        right_end,
+                        &imara_block.operation,
+                    ));
                 }
             }
 
-            // Draw crushed lines for pure insertion blocks (added lines with no left block)
-            for imara_block in &imara_analysis.blocks {
-                if imara_block.is_pure_insertion() && !imara_block.right_range.is_empty() {
-                    let right_start = imara_block.right_range.start;
-                    let right_end = imara_block.right_range.end.saturating_sub(1);
+            // Get stored crushed line positions
+            let left_crushed_rects: Option<Vec<(usize, egui::Rect, String)>> =
+                ui.ctx().memory_mut(|mem| {
+                    mem.data
+                        .get_persisted("left_crushed_rects".to_string().into())
+                });
+            let right_crushed_rects: Option<Vec<(usize, egui::Rect, String)>> =
+                ui.ctx().memory_mut(|mem| {
+                    mem.data
+                        .get_persisted("right_crushed_rects".to_string().into())
+                });
 
-                    if let (Some(right_start_rect), Some(right_end_rect)) =
-                        (right_rects.get(right_start), right_rects.get(right_end))
-                    {
-                        // Create a crushed line on the left side (same Y coordinates for top and bottom)
-                        let left_x_start = if left_rects.is_empty() {
-                            gutter_x_start - 100.0 // If no left content, start from a reasonable position
-                        } else {
-                            // Find the appropriate left position based on context
-                            let left_line_for_insertion = if right_start > 0 {
-                                // Try to find the last left line before this insertion
-                                left_rects.len().saturating_sub(1)
-                            } else {
-                                0
-                            };
+            // Handle pure insertion blocks - connect to actual crushed lines in left pane
+            if let Some(left_crushed) = &left_crushed_rects {
+                for imara_block in &imara_analysis.blocks {
+                    if imara_block.is_pure_insertion() && !imara_block.right_range.is_empty() {
+                        let right_start = imara_block.right_range.start;
+                        let right_end = imara_block.right_range.end.saturating_sub(1);
 
-                            left_rects
-                                .get(
-                                    left_line_for_insertion.min(left_rects.len().saturating_sub(1)),
-                                )
-                                .map(|rect| rect.min.x)
-                                .unwrap_or(gutter_x_start - 100.0)
-                        };
+                        // Find corresponding crushed line
+                        if let Some((_, crushed_rect, _)) =
+                            left_crushed.iter().find(|(idx, _, _)| *idx == right_start)
+                        {
+                            if let (Some(right_start_rect), Some(right_end_rect)) =
+                                (right_rects.get(right_start), right_rects.get(right_end))
+                            {
+                                // Connect from the actual crushed line position to the right block
+                                let left_x_end = gutter_x_start;
+                                let crushed_line_y = crushed_rect.min.y;
 
-                        let left_x_end = gutter_x_start;
-                        let line_top_y = right_start_rect.top();
-                        let line_bottom_y = line_top_y + 2.0; // JetBrains-style 2px height
+                                let right_x_start = right_start_rect.min.x;
+                                let right_top_y = right_start_rect.top();
+                                let right_bottom_y = right_end_rect.bottom();
 
-                        // Use green color for additions with transparency
-                        let addition_color = egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64);
+                                // Use green color for additions with transparency
+                                let addition_color =
+                                    egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64);
 
-                        // Draw a thin line on the left (2px height at the top)
-                        self.draw_connector(
-                            ui,
-                            left_x_start,
-                            line_top_y,
-                            line_bottom_y,
-                            left_x_end,
-                            line_top_y,
-                            line_bottom_y,
-                            addition_color,
-                        );
-
-                        // Draw connector from the thin line to the actual right block
-                        let right_x_start = right_start_rect.min.x;
-                        let right_top_y = right_start_rect.top();
-                        let right_bottom_y = right_end_rect.bottom();
-
-                        self.draw_connector(
-                            ui,
-                            left_x_end,
-                            line_top_y,
-                            line_bottom_y,
-                            right_x_start,
-                            right_top_y,
-                            right_bottom_y,
-                            addition_color,
-                        );
+                                // Draw connector from the crushed line to the actual right block
+                                self.draw_connector(
+                                    ui,
+                                    left_x_end,
+                                    crushed_line_y,
+                                    crushed_line_y + 2.0,
+                                    right_x_start,
+                                    right_top_y,
+                                    right_bottom_y,
+                                    addition_color,
+                                );
+                            }
+                        }
                     }
                 }
             }
 
-            // Draw crushed lines for pure deletion blocks (deleted lines with no right block)
-            for imara_block in &imara_analysis.blocks {
-                if imara_block.is_pure_deletion() && !imara_block.left_range.is_empty() {
-                    let left_start = imara_block.left_range.start;
-                    let left_end = imara_block.left_range.end.saturating_sub(1);
+            // Handle pure deletion blocks - connect to actual crushed lines in right pane
+            if let Some(right_crushed) = &right_crushed_rects {
+                for imara_block in &imara_analysis.blocks {
+                    if imara_block.is_pure_deletion() && !imara_block.left_range.is_empty() {
+                        let left_start = imara_block.left_range.start;
+                        let left_end = imara_block.left_range.end.saturating_sub(1);
 
-                    if let (Some(left_start_rect), Some(left_end_rect)) =
-                        (left_rects.get(left_start), left_rects.get(left_end))
-                    {
-                        // Create a crushed line on the right side (same Y coordinates for top and bottom)
-                        let right_x_start = gutter_x_start + self.config.connector_column_width;
-                        let right_x_end = if right_rects.is_empty() {
-                            right_x_start + 100.0 // If no right content, extend to a reasonable position
-                        } else {
-                            // Find the appropriate right position based on context
-                            right_rects
-                                .get(0)
-                                .map(|rect| rect.max.x)
-                                .unwrap_or(right_x_start + 100.0)
-                        };
+                        // Find corresponding crushed line
+                        if let Some((_, crushed_rect, _)) =
+                            right_crushed.iter().find(|(idx, _, _)| *idx == left_start)
+                        {
+                            if let (Some(left_start_rect), Some(left_end_rect)) =
+                                (left_rects.get(left_start), left_rects.get(left_end))
+                            {
+                                // Connect from the left block to the actual crushed line position
+                                let left_x_end = left_start_rect.max.x;
+                                let left_top_y = left_start_rect.top();
+                                let left_bottom_y = left_end_rect.bottom();
 
-                        let line_top_y = left_start_rect.top();
-                        let line_bottom_y = line_top_y + 2.0; // JetBrains-style 2px height
+                                let right_x_start =
+                                    gutter_x_start + self.config.connector_column_width;
+                                let crushed_line_y = crushed_rect.min.y;
 
-                        // Use red color for deletions with transparency
-                        let deletion_color = egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64);
+                                // Use red color for deletions with transparency
+                                let deletion_color =
+                                    egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64);
 
-                        // Draw connector from the left block to the thin line
-                        let left_x_end = left_start_rect.max.x;
-                        let left_top_y = left_start_rect.top();
-                        let left_bottom_y = left_end_rect.bottom();
-
-                        self.draw_connector(
-                            ui,
-                            left_x_end,
-                            left_top_y,
-                            left_bottom_y,
-                            right_x_start,
-                            line_top_y,
-                            line_bottom_y,
-                            deletion_color,
-                        );
-
-                        // Draw a thin line on the right (2px height at the top)
-                        self.draw_connector(
-                            ui,
-                            right_x_start,
-                            line_top_y,
-                            line_bottom_y,
-                            right_x_end,
-                            line_top_y,
-                            line_bottom_y,
-                            deletion_color,
-                        );
+                                // Draw connector from the left block to the crushed line
+                                self.draw_connector(
+                                    ui,
+                                    left_x_end,
+                                    left_top_y,
+                                    left_bottom_y,
+                                    right_x_start,
+                                    crushed_line_y,
+                                    crushed_line_y + 2.0,
+                                    deletion_color,
+                                );
+                            }
+                        }
                     }
                 }
             }
 
             // Draw connectors for each hunk pair
-            for (left_start, left_end, right_start, right_end) in connectors {
+            for (left_start, left_end, right_start, right_end, operation) in connectors {
                 if let (
                     Some(left_start_rect),
                     Some(left_end_rect),
@@ -278,29 +260,46 @@ impl LayoutManager {
                     let x1 = left_start_rect.max.x; // Exact right edge of left content
                     let x2 = right_start_rect.min.x; // Exact left edge of right content
 
-                    // Determine color based on change type
-                    let left_line_type = old_lines.get(left_start).map(|l| &l.line_type);
-                    let right_line_type = new_lines.get(right_start).map(|l| &l.line_type);
-
-                    let color = match (left_line_type, right_line_type) {
-                        (
-                            Some(crate::models::line::LineType::Deletion),
-                            Some(crate::models::line::LineType::Addition),
-                        ) => {
-                            // Modification: blue
+                    // Determine color based on Imara block operation (prioritize over line types)
+                    let color = match operation {
+                        crate::diff::imara::ImaraBlockOperation::Modify => {
+                            // All Modify blocks should be blue
                             egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
                         }
-                        (Some(crate::models::line::LineType::Deletion), _) => {
-                            // Deletion: red
-                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
-                        }
-                        (_, Some(crate::models::line::LineType::Addition)) => {
+                        crate::diff::imara::ImaraBlockOperation::Insert => {
                             // Addition: green
                             egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64)
                         }
+                        crate::diff::imara::ImaraBlockOperation::Delete => {
+                            // Deletion: red
+                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
+                        }
                         _ => {
-                            // Default: blue for context changes
-                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
+                            // Fallback to line type analysis for other cases
+                            let left_line_type = old_lines.get(left_start).map(|l| &l.line_type);
+                            let right_line_type = new_lines.get(right_start).map(|l| &l.line_type);
+
+                            match (left_line_type, right_line_type) {
+                                (
+                                    Some(crate::models::line::LineType::Deletion),
+                                    Some(crate::models::line::LineType::Addition),
+                                ) => {
+                                    // Modification: blue
+                                    egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
+                                }
+                                (Some(crate::models::line::LineType::Deletion), _) => {
+                                    // Deletion: red
+                                    egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
+                                }
+                                (_, Some(crate::models::line::LineType::Addition)) => {
+                                    // Addition: green
+                                    egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64)
+                                }
+                                _ => {
+                                    // Default: blue for context changes
+                                    egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
+                                }
+                            }
                         }
                     };
 
@@ -459,6 +458,7 @@ impl LayoutManager {
         pane_width: f32,
         total_height: f32,
         mapping_segments: &[MappingSegment],
+        imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
     ) {
         ui.allocate_ui_with_layout(
             Vec2::new(pane_width, total_height),
@@ -483,6 +483,7 @@ impl LayoutManager {
                     "left_scroll",
                     "left_rects",
                     mapping_segments,
+                    imara_analysis,
                 );
             },
         );
@@ -499,6 +500,7 @@ impl LayoutManager {
         pane_width: f32,
         total_height: f32,
         mapping_segments: &[MappingSegment],
+        imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
     ) {
         ui.allocate_ui_with_layout(
             Vec2::new(pane_width, total_height),
@@ -523,6 +525,7 @@ impl LayoutManager {
                     "right_scroll",
                     "right_rects",
                     mapping_segments,
+                    imara_analysis,
                 );
             },
         );
@@ -733,13 +736,14 @@ impl LayoutManager {
         ui: &mut egui::Ui,
         lines: &[DisplayLine],
         scroll_sync: &mut crate::sync::ScrollSync,
-        _theme: &crate::theme::JetBrainsTheme,
+        theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
         is_left: bool,
         scroll_id: &str,
         scroll_memory_key: &str,
         rects_memory_key: &str,
         mapping_segments: &[MappingSegment],
+        imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
     ) {
         let available_height = ui.available_height();
 
@@ -763,11 +767,13 @@ impl LayoutManager {
             current_scroll
         };
 
+        // Capture imara_analysis for use in closure
+        let imara_blocks = &imara_analysis.blocks;
+
         let scroll_output = ScrollArea::vertical()
-            .id_source(scroll_id)
+            .id_salt(scroll_id)
             .auto_shrink([false, false])
             .max_height(available_height)
-            .min_scrolled_height(available_height)
             .scroll_offset(Vec2::new(0.0, scroll_offset))
             .show(ui, |ui| {
                 let mut line_rects = Vec::new();
@@ -777,23 +783,114 @@ impl LayoutManager {
                     line_rects.push(rect);
                 }
 
+                // Render crushed block lines for pure additions/deletions and store their positions
+                let mut crushed_line_rects = Vec::new();
+                for imara_block in imara_blocks {
+                    if is_left
+                        && imara_block.is_pure_insertion()
+                        && !imara_block.right_range.is_empty()
+                    {
+                        // Draw 2px crushed line for pure addition in left pane (where content is missing)
+                        // Find the appropriate line position to place the crushed line
+                        let target_line_idx = imara_block.right_range.start;
+
+                        // Use actual line position if we have a corresponding line, otherwise calculate
+                        let y_position = if let Some(line_rect) = line_rects.get(target_line_idx) {
+                            line_rect.min.y
+                        } else if target_line_idx > 0 {
+                            if let Some(prev_rect) = line_rects.get(target_line_idx - 1) {
+                                prev_rect.max.y
+                            } else if let Some(first_rect) = line_rects.first() {
+                                first_rect.min.y
+                            } else {
+                                target_line_idx as f32 * theme.line_height()
+                            }
+                        } else if let Some(first_rect) = line_rects.first() {
+                            first_rect.min.y
+                        } else {
+                            target_line_idx as f32 * theme.line_height()
+                        };
+
+                        let crushed_rect = egui::Rect::from_min_max(
+                            egui::Pos2::new(0.0, y_position),
+                            egui::Pos2::new(ui.available_width(), y_position + 2.0),
+                        );
+                        let addition_color =
+                            egui::Color32::from_rgba_unmultiplied(76, 175, 80, 128);
+                        ui.painter().rect_filled(crushed_rect, 0.0, addition_color);
+
+                        // Store crushed line info for connectors
+                        crushed_line_rects.push((
+                            imara_block.right_range.start,
+                            crushed_rect,
+                            "addition".to_string(),
+                        ));
+                    } else if !is_left
+                        && imara_block.is_pure_deletion()
+                        && !imara_block.left_range.is_empty()
+                    {
+                        // Draw 2px crushed line for pure deletion in right pane (where content is missing)
+                        // Find the appropriate line position to place the crushed line
+                        let target_line_idx = imara_block.left_range.start;
+
+                        // Use actual line position if we have a corresponding line, otherwise calculate
+                        let y_position = if let Some(line_rect) = line_rects.get(target_line_idx) {
+                            line_rect.min.y
+                        } else if target_line_idx > 0 {
+                            if let Some(prev_rect) = line_rects.get(target_line_idx - 1) {
+                                prev_rect.max.y
+                            } else if let Some(first_rect) = line_rects.first() {
+                                first_rect.min.y
+                            } else {
+                                target_line_idx as f32 * theme.line_height()
+                            }
+                        } else if let Some(first_rect) = line_rects.first() {
+                            first_rect.min.y
+                        } else {
+                            target_line_idx as f32 * theme.line_height()
+                        };
+
+                        let crushed_rect = egui::Rect::from_min_max(
+                            egui::Pos2::new(0.0, y_position),
+                            egui::Pos2::new(ui.available_width(), y_position + 2.0),
+                        );
+                        let deletion_color =
+                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 128);
+                        ui.painter().rect_filled(crushed_rect, 0.0, deletion_color);
+
+                        // Store crushed line info for connectors
+                        crushed_line_rects.push((
+                            imara_block.left_range.start,
+                            crushed_rect,
+                            "deletion".to_string(),
+                        ));
+                    }
+                }
+
+                // Store crushed line positions for connectors
+                let crushed_memory_key = if is_left {
+                    "left_crushed_rects"
+                } else {
+                    "right_crushed_rects"
+                };
+                ui.ctx().memory_mut(|mem| {
+                    mem.data.insert_persisted(
+                        crushed_memory_key.to_string().into(),
+                        crushed_line_rects,
+                    );
+                });
+
                 ui.ctx().memory_mut(|mem| {
                     mem.data
                         .insert_persisted(rects_memory_key.to_string().into(), line_rects);
                 });
             });
 
-        // Update scroll sync
+        // Update scroll sync without automatic synchronization
         if is_left {
             scroll_sync.set_left_scroll(scroll_output.state.offset.y);
-            // Synchronize right pane
-            scroll_sync
-                .synchronize_scrolls(|y| crate::sync::map_left_to_right(y, mapping_segments));
         } else {
             scroll_sync.set_right_scroll(scroll_output.state.offset.y);
-            // Synchronize left pane
-            scroll_sync
-                .synchronize_scrolls(|y| crate::sync::map_right_to_left(y, mapping_segments));
         }
 
         // Store scroll position
