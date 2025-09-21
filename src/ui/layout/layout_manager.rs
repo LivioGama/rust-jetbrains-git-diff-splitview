@@ -7,7 +7,7 @@ use crate::models::diff::MappingSegment;
 use crate::models::line::DisplayLine;
 use crate::ui::ConnectorRenderer;
 use eframe::egui;
-use egui::{Pos2, Vec2};
+use egui::{Pos2, Rect, Vec2};
 
 /// Layout manager for the diff viewer
 pub struct LayoutManager {
@@ -41,7 +41,7 @@ impl LayoutManager {
         scroll_sync: &mut crate::sync::ScrollSync,
         theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
-        connector_renderer: &mut crate::ui::ConnectorRenderer,
+        _connector_renderer: &mut crate::ui::ConnectorRenderer,
         mapping_segments: &[MappingSegment],
         imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
     ) {
@@ -109,10 +109,10 @@ impl LayoutManager {
     fn render_connectors(
         &self,
         ui: &mut egui::Ui,
-        old_lines: &[DisplayLine],
-        new_lines: &[DisplayLine],
+        _old_lines: &[DisplayLine],
+        _new_lines: &[DisplayLine],
         pane_width: f32,
-        scroll_sync: &crate::sync::ScrollSync,
+        _scroll_sync: &crate::sync::ScrollSync,
         imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
     ) {
         // Get stored rectangle positions
@@ -332,10 +332,6 @@ impl LayoutManager {
                         crate::diff::imara::ImaraBlockOperation::Delete => {
                             // Deletion: red
                             egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
-                        }
-                        _ => {
-                            // Default: blue for modifications
-                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
                         }
                     };
 

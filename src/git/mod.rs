@@ -1,6 +1,6 @@
+#[allow(dead_code)]
 // diffsplit/src/git/mod.rs
 // Git operations module
-
 use std::process::Command;
 
 /// Git operation result
@@ -93,26 +93,6 @@ impl GitOps {
         } else {
             Vec::new()
         }
-    }
-
-    /// Get git status
-    pub fn get_status(&self) -> GitResult {
-        self.execute_command(&["status", "--porcelain"])
-    }
-
-    /// Get git diff (general diff without specifying a file)
-    pub fn get_diff(&self, from_commit: Option<&str>, to_commit: Option<&str>) -> GitResult {
-        let mut args = vec!["diff"];
-
-        if let Some(from) = from_commit {
-            args.push(from);
-        }
-
-        if let Some(to) = to_commit {
-            args.push(to);
-        }
-
-        self.execute_command(&args)
     }
 }
 

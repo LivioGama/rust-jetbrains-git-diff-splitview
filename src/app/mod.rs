@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::actions::*;
 use crate::config::*;
-use crate::git::GitOps;
+
 use crate::navigation::*;
 use crate::state::*;
 use crate::sync::*;
@@ -171,7 +171,7 @@ impl DiffViewerApp {
             state.current_file = file_path.to_string_lossy().to_string();
             state.left_lines = old_lines;
             state.right_lines = new_lines;
-            state.change_blocks = change_blocks;
+            state.change_blocks = change_blocks.to_vec();
             state.imara_analysis = imara_analysis;
             state.anchors = anchors;
             state.mapping_segments = mapping_segments;
@@ -260,69 +260,10 @@ impl DiffViewerApp {
             state.current_file = file_path.to_string();
             state.left_lines = old_lines;
             state.right_lines = new_lines;
-            state.change_blocks = change_blocks;
+            state.change_blocks = change_blocks.to_vec();
             state.imara_analysis = imara_analysis;
             state.anchors = anchors;
             state.mapping_segments = mapping_segments;
-            state.reset_navigation();
-            state.left_scroll_offset = 0.0;
-            state.right_scroll_offset = 0.0;
-        });
-
-        self.scroll_sync.set_left_scroll(0.0);
-        self.scroll_sync.set_right_scroll(0.0);
-    }
-
-    fn load_git_diff_overview(&mut self) {
-        use crate::models::line::{DisplayLine, LineType};
-
-        eprintln!("Loading git diff overview from current directory");
-
-        let git_ops = GitOps::with_current_dir();
-
-        // Get git status to show changed files
-        let status_result = git_ops.get_status();
-        let status_output = if status_result.success {
-            eprintln!("✅ Got git status ({} chars)", status_result.stdout.len());
-            status_result.stdout
-        } else {
-            eprintln!("❌ Failed to get git status, using fallback");
-            "No git changes found or not a git repository".to_string()
-        };
-
-        // Create a simple text display showing the git status
-        let content = format!(
-            "Git Diff Overview - Current Directory:\n\n{}",
-            if status_output.is_empty() {
-                "No changes detected".to_string()
-            } else {
-                status_output
-            }
-        );
-
-        // Create display lines for the status output
-        let lines: Vec<&str> = content.lines().collect();
-        let display_lines: Vec<DisplayLine> = lines
-            .into_iter()
-            .map(|line| DisplayLine::new(line.to_string(), LineType::Context))
-            .collect();
-
-        // Create right pane with same content (git status overview)
-        let right_lines: Vec<DisplayLine> = display_lines.clone();
-
-        self.state_manager.update_state(|state| {
-            state.current_file = "Git Diff Overview".to_string();
-            state.left_lines = display_lines;
-            state.right_lines = right_lines;
-            state.change_blocks = Vec::new();
-            state.imara_analysis = crate::diff::imara::ImaraDiffAnalysis {
-                blocks: Vec::new(),
-                line_mapping: Vec::new(),
-                total_old_lines: 0,
-                total_new_lines: 0,
-            };
-            state.anchors = Vec::new();
-            state.mapping_segments = Vec::new();
             state.reset_navigation();
             state.left_scroll_offset = 0.0;
             state.right_scroll_offset = 0.0;

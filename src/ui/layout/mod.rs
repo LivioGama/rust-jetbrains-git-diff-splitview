@@ -5,9 +5,7 @@ pub mod gutter;
 pub mod layout_manager;
 pub mod panes;
 
-pub use gutter::*;
 pub use layout_manager::*;
-pub use panes::*;
 
 #[cfg(test)]
 mod tests {

@@ -145,7 +145,6 @@ impl SyntaxHighlighter {
                 '/' if chars.peek().map(|(_, c)| *c) == Some('/') => {
                     if !current_token.is_empty() {
                         self.push_token(&mut tokens, current_token, current_type, token_start, pos);
-                        current_token = String::new();
                         token_start = pos;
                     }
                     // Rest of line is comment

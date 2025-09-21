@@ -1,6 +1,6 @@
+#[allow(dead_code)]
 // diffsplit/src/navigation/mod.rs
 // Keyboard navigation module for diff viewer
-
 use eframe::egui;
 
 /// Navigation actions that can be performed
@@ -74,35 +74,6 @@ impl NavigationHandler {
 
         if self.state.current_connector_index >= total_connectors && total_connectors > 0 {
             self.state.current_connector_index = total_connectors - 1;
-        }
-    }
-
-    /// Get the current navigation state
-    pub fn get_state(&self) -> &NavigationState {
-        &self.state
-    }
-
-    /// Get the current block index
-    pub fn current_block_index(&self) -> usize {
-        self.state.current_block_index
-    }
-
-    /// Get the current connector index
-    pub fn current_connector_index(&self) -> usize {
-        self.state.current_connector_index
-    }
-
-    /// Set the current block index
-    pub fn set_current_block_index(&mut self, index: usize) {
-        if index < self.state.total_blocks {
-            self.state.current_block_index = index;
-        }
-    }
-
-    /// Set the current connector index
-    pub fn set_current_connector_index(&mut self, index: usize) {
-        if index < self.state.total_connectors {
-            self.state.current_connector_index = index;
         }
     }
 

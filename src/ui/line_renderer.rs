@@ -24,8 +24,8 @@ impl LineRenderer {
         &self,
         ui: &mut egui::Ui,
         line: &DisplayLine,
-        line_idx: usize,
-        is_left: bool,
+        _line_idx: usize,
+        _is_left: bool,
     ) -> Rect {
         let line_height = self.theme.line_height();
         let available_width = ui.available_width();
@@ -50,10 +50,10 @@ impl LineRenderer {
 
         // Draw JetBrains-style highlight for changed lines - ALWAYS draw background for changes
         if bg_color != Color32::TRANSPARENT {
-            // Fill background for the entire line 
+            // Fill background for the entire line
             ui.painter().rect_filled(rect, 0.0, bg_color);
         }
-        
+
         // Additional highlight rendering for special cases
         if line.line_type != LineType::Context {
             self.highlight_renderer
@@ -68,29 +68,32 @@ impl LineRenderer {
                 LineType::Modification => self.theme.modification_background,
                 _ => Color32::TRANSPARENT,
             };
-            
+
             if indicator_color != Color32::TRANSPARENT {
                 // Draw 2px wide colored bar on the left edge
                 let indicator_rect = egui::Rect::from_min_size(
                     egui::Pos2::new(rect.min.x, rect.min.y),
                     egui::Vec2::new(2.0, rect.height()),
                 );
-                ui.painter().rect_filled(indicator_rect, 0.0, indicator_color);
+                ui.painter()
+                    .rect_filled(indicator_rect, 0.0, indicator_color);
             }
         }
 
         // Use TextRenderer for line number rendering
-        self.text_renderer.render_line_number(ui, line, rect, baseline_y);
+        self.text_renderer
+            .render_line_number(ui, line, rect, baseline_y);
 
         // Use TextRenderer for content and highlighting
-        self.text_renderer.render_content(ui, line, rect, baseline_y);
-        self.text_renderer.render_word_highlights(ui, line, rect, baseline_y);
+        self.text_renderer
+            .render_content(ui, line, rect, baseline_y);
+        self.text_renderer
+            .render_word_highlights(ui, line, rect, baseline_y);
 
         // Note: Block delimiters will be drawn by the pane renderer, not per-line
 
         rect
     }
-
 
     fn blend_colors(
         &self,

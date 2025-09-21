@@ -28,12 +28,7 @@ impl AppState {
             left_lines: Vec::new(),
             right_lines: Vec::new(),
             change_blocks: Vec::new(),
-            imara_analysis: crate::diff::imara::ImaraDiffAnalysis {
-                blocks: Vec::new(),
-                line_mapping: Vec::new(),
-                total_old_lines: 0,
-                total_new_lines: 0,
-            },
+            imara_analysis: crate::diff::imara::ImaraDiffAnalysis { blocks: Vec::new() },
             anchors: Vec::new(),
             mapping_segments: Vec::new(),
             connector_curves: Vec::new(),
