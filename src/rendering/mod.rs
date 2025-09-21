@@ -113,6 +113,7 @@ impl LineRenderer {
                     self.theme.modification_background
                 }
             }
+            LineType::Modification => self.theme.modification_background,
             LineType::Empty => Color32::TRANSPARENT,
         }
     }
@@ -177,8 +178,17 @@ impl LineRenderer {
                         0.7,
                     )
                 }
+                crate::models::line::LineType::Modification => {
+                    // For modification lines, blend syntax color with modification foreground
+                    self.blend_colors(
+                        self.syntax_highlighter
+                            .get_color_for_token(&token.token_type),
+                        self.theme.modification_foreground,
+                        0.7,
+                    )
+                }
                 _ => {
-                    // For context lines, use pure syntax highlighting
+                    // For context lines and others, use regular syntax color
                     self.syntax_highlighter
                         .get_color_for_token(&token.token_type)
                 }
@@ -236,21 +246,27 @@ impl LineRenderer {
             rect
         };
 
-        for (start, end) in &line.word_highlights {
-            if *start >= line.content.len() {
+        for (start, end, highlight_type) in &line.word_highlights {
+            // Convert character indices to byte indices for string slicing
+            let char_indices: Vec<(usize, char)> = line.content.char_indices().collect();
+            if *start >= char_indices.len() || *end > char_indices.len() {
                 continue;
             }
 
-            let highlight_start = *start.min(&line.content.len());
-            let highlight_end = *end.min(&line.content.len());
+            let byte_start = char_indices[*start].0;
+            let byte_end = if *end == char_indices.len() {
+                line.content.len()
+            } else {
+                char_indices[*end].0
+            };
 
-            if highlight_start >= highlight_end {
+            if byte_start >= byte_end {
                 continue;
             }
 
             // Calculate highlight rectangle
-            let text_before = &line.content[..highlight_start];
-            let highlighted_text = &line.content[highlight_start..highlight_end];
+            let text_before = &line.content[..byte_start];
+            let highlighted_text = &line.content[byte_start..byte_end];
 
             let before_width = ui
                 .painter()
@@ -280,8 +296,13 @@ impl LineRenderer {
                 ),
             );
 
+            let highlight_color = match highlight_type {
+                crate::models::line::HighlightType::Insert => self.theme.addition_foreground,
+                crate::models::line::HighlightType::Delete => self.theme.color_blue_500,
+            };
+
             ui.painter()
-                .rect_filled(highlight_rect, 2.0, self.theme.modification_foreground);
+                .rect_filled(highlight_rect, 2.0, highlight_color);
         }
     }
 
@@ -296,6 +317,7 @@ impl LineRenderer {
                     self.theme.modification_foreground
                 }
             }
+            LineType::Modification => self.theme.modification_foreground,
             LineType::Empty => self.theme.foreground,
         }
     }
@@ -341,6 +363,10 @@ impl HighlightRenderer {
                     self.theme.color_blue_500.b(),
                     64,
                 )
+            }
+            crate::models::line::LineType::Modification => {
+                // Blue background for modifications
+                self.theme.modification_background
             }
             _ => Color32::TRANSPARENT,
         };
