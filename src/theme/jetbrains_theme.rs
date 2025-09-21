@@ -173,6 +173,7 @@ impl JetBrainsTheme {
         match line_type {
             crate::models::line::LineType::Addition => self.addition_background,
             crate::models::line::LineType::Deletion => self.deletion_background,
+            crate::models::line::LineType::Modification => self.modification_background,
             _ => self.modification_background,
         }
     }
@@ -181,6 +182,7 @@ impl JetBrainsTheme {
         match line_type {
             crate::models::line::LineType::Addition => self.addition_background,
             crate::models::line::LineType::Deletion => self.deletion_background,
+            crate::models::line::LineType::Modification => self.modification_background,
             crate::models::line::LineType::Context => Color32::TRANSPARENT,
             crate::models::line::LineType::Empty => Color32::TRANSPARENT,
         }
