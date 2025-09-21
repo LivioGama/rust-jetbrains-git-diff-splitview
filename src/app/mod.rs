@@ -7,8 +7,8 @@ use crate::navigation::*;
 use crate::state::*;
 use crate::sync::*;
 use crate::theme::*;
-use crate::ui::layout::*;
-use crate::ui::*;
+use crate::ui::layout::LayoutManager;
+use crate::ui::{LineRenderer, ConnectorRenderer};
 
 pub struct DiffViewerApp {
     pub state_manager: StateManager,
@@ -45,7 +45,7 @@ impl DiffViewerApp {
             scroll_sync: ScrollSync::new(line_height, viewport_height),
             theme: theme.clone(),
             line_renderer: LineRenderer::new(theme.clone()),
-            connector_renderer: ConnectorRenderer::new(theme),
+            connector_renderer: ConnectorRenderer::new(theme.clone()),
             navigation_handler: NavigationHandler::new(),
             layout_manager: LayoutManager::new(config_manager.get_config().layout.clone()),
             config_manager,

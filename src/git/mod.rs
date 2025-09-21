@@ -99,12 +99,9 @@ mod tests {
         let result = GitResult {
             success: true,
             stdout: "output".to_string(),
-            stderr: String::new(),
-            exit_code: Some(0),
         };
 
         assert!(result.success);
         assert_eq!(result.stdout, "output");
-        assert_eq!(result.exit_code, Some(0));
     }
 }

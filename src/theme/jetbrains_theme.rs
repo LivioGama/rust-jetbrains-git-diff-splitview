@@ -47,11 +47,11 @@ impl JetBrainsTheme {
             addition_background: Color32::from_rgb(52, 85, 52),
             addition_foreground: Color32::from_rgb(129, 199, 132),
             addition_gutter: Color32::from_rgb(52, 85, 52),
-            deletion_background: Color32::from_rgba_unmultiplied(113, 113, 113, 64),
+            deletion_background: Color32::from_rgb(85, 56, 56), // Rouge foncé solide (pas de transparence)
             deletion_foreground: Color32::from_rgb(239, 154, 154),
             deletion_gutter: Color32::from_rgb(113, 113, 113),
             modification_background: Color32::from_rgb(50, 66, 98),
-            modification_foreground: Color32::from_rgb(255, 249, 196),
+            modification_foreground: Color32::from_rgb(212, 212, 212), // Use normal foreground for modifications
             modification_gutter: Color32::from_rgb(50, 66, 98),
             code_foreground: Color32::from_rgb(212, 212, 212),
             code_comment: Color32::from_rgb(106, 153, 85),
@@ -217,11 +217,11 @@ impl JetBrainsTheme {
             addition_background: Color32::from_rgb(40, 60, 40),
             addition_foreground: Color32::from_rgb(100, 180, 100),
             addition_gutter: Color32::from_rgb(40, 60, 40),
-            deletion_background: Color32::from_rgb(80, 80, 80),
+            deletion_background: Color32::from_rgb(80, 50, 50), // Rouge plus visible
             deletion_foreground: Color32::from_rgb(200, 120, 120),
             deletion_gutter: Color32::from_rgb(80, 80, 80),
             modification_background: Color32::from_rgb(40, 50, 80),
-            modification_foreground: Color32::from_rgb(200, 200, 150),
+            modification_foreground: Color32::from_rgb(200, 200, 200), // Use normal foreground for modifications
             modification_gutter: Color32::from_rgb(40, 50, 80),
             code_foreground: Color32::from_rgb(200, 200, 200),
             code_comment: Color32::from_rgb(100, 140, 80),

@@ -15,6 +15,8 @@ pub struct ScrollSync {
     right_scroll_offset: f32,
     viewport_height: f32,
     line_height: f32,
+    // Cache for frequent calculations
+    cached_half_viewport: f32,
 }
 
 impl ScrollSync {
@@ -25,6 +27,7 @@ impl ScrollSync {
             right_scroll_offset: 0.0,
             viewport_height,
             line_height,
+            cached_half_viewport: viewport_height / 2.0,
         }
     }
 
@@ -47,16 +50,17 @@ impl ScrollSync {
     }
 
     pub fn synchronize_scrolls(&mut self, mapping_function: impl Fn(f32) -> f32) {
+        // Use cached half viewport calculation for better performance
         match self.master_pane {
             MasterPane::Left => {
-                let left_center = self.left_scroll_offset + self.viewport_height / 2.0;
+                let left_center = self.left_scroll_offset + self.cached_half_viewport;
                 let right_target_center = mapping_function(left_center);
-                self.right_scroll_offset = right_target_center - self.viewport_height / 2.0;
+                self.right_scroll_offset = right_target_center - self.cached_half_viewport;
             }
             MasterPane::Right => {
-                let right_center = self.right_scroll_offset + self.viewport_height / 2.0;
+                let right_center = self.right_scroll_offset + self.cached_half_viewport;
                 let left_target_center = mapping_function(right_center);
-                self.left_scroll_offset = left_target_center - self.viewport_height / 2.0;
+                self.left_scroll_offset = left_target_center - self.cached_half_viewport;
             }
             MasterPane::None => {}
         }
@@ -64,6 +68,8 @@ impl ScrollSync {
 
     pub fn update_viewport_height(&mut self, height: f32) {
         self.viewport_height = height;
+        // Update cache when viewport height changes
+        self.cached_half_viewport = height / 2.0;
     }
 
     pub fn master_pane(&self) -> MasterPane {

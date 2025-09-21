@@ -1,9 +1,11 @@
 // diffsplit/src/config/mod.rs
 // Application configuration module
 
+pub mod app_config;
 pub mod editor_settings;
 pub mod fonts;
 
+pub use app_config::*;
 pub use editor_settings::*;
 pub use fonts::*;
 
