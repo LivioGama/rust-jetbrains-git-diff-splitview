@@ -14,8 +14,8 @@ pub struct FileConfig {
 impl Default for FileConfig {
     fn default() -> Self {
         Self {
-            git_repo_path: "/Users/livio/Documents/anbiti-apps".to_string(),
-            file_path: "apps/app/app/Providers.tsx".to_string(),
+            git_repo_path: ".".to_string(),
+            file_path: "".to_string(),
         }
     }
 }

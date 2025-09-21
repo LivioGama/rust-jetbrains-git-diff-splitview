@@ -19,6 +19,7 @@ mod state;
 mod sync;
 mod syntax;
 mod theme;
+mod toolbar;
 mod ui;
 mod utils;
 
@@ -45,7 +46,7 @@ fn main() -> Result<(), eframe::Error> {
 
     // Initialize the application using the bootstrap
     let bootstrap = crate::core::app_bootstrap::AppBootstrap::initialize()?;
-    
+
     // Run the application
     eframe::run_native(
         "JetBrains Diff Viewer - Modular",
