@@ -1,10 +1,10 @@
 // src/syntax/highlighter.rs
 // Syntax highlighter extracted from syntax/mod.rs
 
-use egui::Color32;
-use std::collections::HashMap;
 use super::colors::JetBrainsColors;
 use super::token_types::{ColoredToken, TokenType};
+use egui::Color32;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct SyntaxHighlighter {
@@ -17,17 +17,84 @@ impl SyntaxHighlighter {
 
         // Essential keywords for common languages
         let keyword_list = vec![
-            "if", "else", "for", "while", "do", "switch", "case", "break", "continue", "return",
-            "function", "fn", "def", "class", "struct", "enum", "interface", "public", "private",
-            "protected", "static", "final", "const", "let", "var", "import", "export", "from",
-            "as", "try", "catch", "throw", "async", "await", "yield", "true", "false", "null",
-            "undefined", "this", "super", "new", "delete", "typeof", "instanceof", "in", "of",
+            "if",
+            "else",
+            "for",
+            "while",
+            "do",
+            "switch",
+            "case",
+            "break",
+            "continue",
+            "return",
+            "function",
+            "fn",
+            "def",
+            "class",
+            "struct",
+            "enum",
+            "interface",
+            "public",
+            "private",
+            "protected",
+            "static",
+            "final",
+            "const",
+            "let",
+            "var",
+            "import",
+            "export",
+            "from",
+            "as",
+            "try",
+            "catch",
+            "throw",
+            "async",
+            "await",
+            "yield",
+            "true",
+            "false",
+            "null",
+            "undefined",
+            "this",
+            "super",
+            "new",
+            "delete",
+            "typeof",
+            "instanceof",
+            "in",
+            "of",
             // TypeScript/JavaScript specific
-            "type", "namespace", "module", "declare", "abstract", "readonly", "never", "any",
-            "unknown", "string", "number", "boolean", "object", "symbol", "bigint",
+            "type",
+            "namespace",
+            "module",
+            "declare",
+            "abstract",
+            "readonly",
+            "never",
+            "any",
+            "unknown",
+            "string",
+            "number",
+            "boolean",
+            "object",
+            "symbol",
+            "bigint",
             // React/JSX
-            "React", "Component", "useState", "useEffect", "useContext", "useMemo", "useCallback",
-            "useState", "useReducer", "useRef", "forwardRef", "memo", "lazy", "Suspense",
+            "React",
+            "Component",
+            "useState",
+            "useEffect",
+            "useContext",
+            "useMemo",
+            "useCallback",
+            "useState",
+            "useReducer",
+            "useRef",
+            "forwardRef",
+            "memo",
+            "lazy",
+            "Suspense",
         ];
 
         for keyword in keyword_list {
@@ -65,7 +132,7 @@ impl SyntaxHighlighter {
                     }
                     current_token.push(ch);
                     current_type = TokenType::String;
-                    
+
                     // Continue until closing quote
                     while let Some((_, next_ch)) = chars.next() {
                         current_token.push(next_ch);
@@ -98,10 +165,18 @@ impl SyntaxHighlighter {
                 }
                 // Handle identifiers and keywords
                 c if c.is_ascii_alphanumeric() || c == '_' => {
-                    if current_type == TokenType::Number || 
-                       (current_type != TokenType::PlainText && current_type != TokenType::Keyword) {
+                    if current_type == TokenType::Number
+                        || (current_type != TokenType::PlainText
+                            && current_type != TokenType::Keyword)
+                    {
                         if !current_token.is_empty() {
-                            self.push_token(&mut tokens, current_token, current_type, token_start, pos);
+                            self.push_token(
+                                &mut tokens,
+                                current_token,
+                                current_type,
+                                token_start,
+                                pos,
+                            );
                             current_token = String::new();
                             token_start = pos;
                         }
@@ -154,7 +229,13 @@ impl SyntaxHighlighter {
         // Push final token
         if !current_token.is_empty() {
             let end_pos = line.len();
-            self.push_token(&mut tokens, current_token, current_type, token_start, end_pos);
+            self.push_token(
+                &mut tokens,
+                current_token,
+                current_type,
+                token_start,
+                end_pos,
+            );
         }
 
         tokens

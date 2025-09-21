@@ -23,7 +23,7 @@ mod tests {
         let highlighter = SyntaxHighlighter::new();
         let tokens = highlighter.highlight_line("function test() { return true; }");
         assert!(!tokens.is_empty());
-        
+
         // Should detect 'function' as keyword
         let function_token = tokens.iter().find(|t| t.text == "function");
         assert!(function_token.is_some());
@@ -41,7 +41,7 @@ mod tests {
     fn test_jetbrains_colors() {
         let keyword_color = JetBrainsColors::get_color_for_token(&TokenType::Keyword);
         let string_color = JetBrainsColors::get_color_for_token(&TokenType::String);
-        
+
         // Colors should be different
         assert_ne!(keyword_color, string_color);
     }

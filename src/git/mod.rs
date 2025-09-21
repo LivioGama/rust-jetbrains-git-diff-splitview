@@ -70,6 +70,50 @@ impl GitOps {
 
         self.execute_command(&args)
     }
+
+    /// Get the list of changed files from git diff
+    pub fn get_changed_files(
+        &self,
+        from_commit: Option<&str>,
+        to_commit: Option<&str>,
+    ) -> Vec<String> {
+        let mut args = vec!["diff", "--name-only"];
+
+        if let Some(from) = from_commit {
+            args.push(from);
+        }
+
+        if let Some(to) = to_commit {
+            args.push(to);
+        }
+
+        let result = self.execute_command(&args);
+        if result.success {
+            result.stdout.lines().map(|s| s.to_string()).collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get git status
+    pub fn get_status(&self) -> GitResult {
+        self.execute_command(&["status", "--porcelain"])
+    }
+
+    /// Get git diff (general diff without specifying a file)
+    pub fn get_diff(&self, from_commit: Option<&str>, to_commit: Option<&str>) -> GitResult {
+        let mut args = vec!["diff"];
+
+        if let Some(from) = from_commit {
+            args.push(from);
+        }
+
+        if let Some(to) = to_commit {
+            args.push(to);
+        }
+
+        self.execute_command(&args)
+    }
 }
 
 impl Default for GitOps {

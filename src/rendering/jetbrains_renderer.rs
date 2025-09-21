@@ -32,9 +32,12 @@ impl JetBrainsRenderer {
         _mapping_segments: &[MappingSegment],
     ) {
         // Delegate to specialized renderers
-        eprintln!("🎨 JetBrainsRenderer rendering {} left lines and {} right lines", 
-                 left_lines.len(), right_lines.len());
-        
+        eprintln!(
+            "🎨 JetBrainsRenderer rendering {} left lines and {} right lines",
+            left_lines.len(),
+            right_lines.len()
+        );
+
         // Basic layout - actual rendering delegated to LayoutManager
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
@@ -42,7 +45,7 @@ impl JetBrainsRenderer {
                     self.line_renderer.render_line(ui, line, idx, true);
                 }
             });
-            
+
             ui.vertical(|ui| {
                 for (idx, line) in right_lines.iter().enumerate() {
                     self.line_renderer.render_line(ui, line, idx, false);
@@ -52,9 +55,9 @@ impl JetBrainsRenderer {
     }
 
     fn should_highlight_line(&self, line_index: usize, change_blocks: &[ChangeBlock]) -> bool {
-        change_blocks.iter().any(|block| 
-            line_index >= block.start_line && line_index <= block.end_line
-        )
+        change_blocks
+            .iter()
+            .any(|block| line_index >= block.start_line && line_index <= block.end_line)
     }
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {

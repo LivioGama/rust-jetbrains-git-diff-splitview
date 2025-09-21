@@ -71,7 +71,10 @@ impl ConnectorRenderer {
         _top_y: f32,
     ) {
         // Simplified connector rendering - main logic moved to ui/layout modules
-        eprintln!("🔗 ConnectorRenderer rendering {} change blocks", change_blocks.len());
+        eprintln!(
+            "🔗 ConnectorRenderer rendering {} change blocks",
+            change_blocks.len()
+        );
     }
 
     pub fn update_theme(&mut self, theme: JetBrainsTheme) {

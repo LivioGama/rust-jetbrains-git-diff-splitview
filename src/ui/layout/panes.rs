@@ -1,11 +1,11 @@
 // src/ui/layout/panes.rs
 // Pane rendering logic extracted from layout/mod.rs
 
-use eframe::egui;
-use egui::{FontId, ScrollArea, Vec2};
 use crate::config::LayoutConfig;
 use crate::models::diff::MappingSegment;
 use crate::models::line::DisplayLine;
+use eframe::egui;
+use egui::{FontId, ScrollArea, Vec2};
 
 /// Pane rendering functionality for the layout manager
 pub struct PaneRenderer {
@@ -149,11 +149,104 @@ impl PaneRenderer {
             // Store line rectangles for connector calculations
             let mut line_rects = Vec::new();
             let mut crushed_rects = Vec::new();
+            let mut crushed_line_rects = Vec::new();
 
             ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
 
-            // Render each line first
-            for (line_idx, line) in lines.iter().enumerate() {
+            // Create a combined rendering plan that includes both normal lines and crushed blocks in proper sequence
+            let mut line_idx = 0;
+
+            // Process each imara block to determine where crushed blocks should be inserted
+            for imara_block in &imara_analysis.blocks {
+                // Render normal lines up to this block's position
+                let target_line_end = if is_left {
+                    if imara_block.is_pure_insertion() {
+                        // For pure insertions in left pane, render lines up to the insertion point
+                        imara_block.right_range.start.saturating_sub(
+                            imara_analysis
+                                .blocks
+                                .iter()
+                                .filter(|b| {
+                                    b.right_range.end <= imara_block.right_range.start
+                                        && b.is_pure_insertion()
+                                })
+                                .map(|b| b.right_range.len())
+                                .sum::<usize>(),
+                        )
+                    } else {
+                        imara_block.left_range.end
+                    }
+                } else {
+                    if imara_block.is_pure_deletion() {
+                        // For pure deletions in right pane, render lines up to the deletion point
+                        imara_block.left_range.start.saturating_sub(
+                            imara_analysis
+                                .blocks
+                                .iter()
+                                .filter(|b| {
+                                    b.left_range.end <= imara_block.left_range.start
+                                        && b.is_pure_deletion()
+                                })
+                                .map(|b| b.left_range.len())
+                                .sum::<usize>(),
+                        )
+                    } else {
+                        imara_block.right_range.end
+                    }
+                };
+
+                // Render normal lines up to the target position
+                while line_idx < target_line_end.min(lines.len()) {
+                    let line = &lines[line_idx];
+                    let line_rect = line_renderer.render_line(ui, line, line_idx, is_left);
+                    line_rects.push(line_rect);
+
+                    // Track crushed lines for pure insertion handling
+                    if line.content.starts_with("...") {
+                        crushed_rects.push((line_idx, line_rect, line.content.clone()));
+                    }
+                    line_idx += 1;
+                }
+
+                // Insert crushed block if needed
+                if (is_left
+                    && imara_block.is_pure_insertion()
+                    && !imara_block.right_range.is_empty())
+                    || (!is_left
+                        && imara_block.is_pure_deletion()
+                        && !imara_block.left_range.is_empty())
+                {
+                    // Allocate space for the crushed block within the UI layout
+                    let (crushed_rect, _response) = ui.allocate_exact_size(
+                        egui::Vec2::new(ui.available_width(), 2.0),
+                        egui::Sense::hover(),
+                    );
+
+                    let (color, block_type, block_idx) =
+                        if is_left && imara_block.is_pure_insertion() {
+                            (
+                                egui::Color32::from_rgba_unmultiplied(76, 175, 80, 128),
+                                "addition",
+                                imara_block.right_range.start,
+                            )
+                        } else {
+                            (
+                                egui::Color32::from_rgba_unmultiplied(244, 67, 54, 128),
+                                "deletion",
+                                imara_block.left_range.start,
+                            )
+                        };
+
+                    ui.painter().rect_filled(crushed_rect, 0.0, color);
+
+                    // Store crushed line info for connectors
+                    crushed_line_rects.push((block_idx, crushed_rect, block_type.to_string()));
+                }
+            }
+
+            // Render any remaining normal lines
+            while line_idx < lines.len() {
+                let line = &lines[line_idx];
                 let line_rect = line_renderer.render_line(ui, line, line_idx, is_left);
                 line_rects.push(line_rect);
 
@@ -161,90 +254,7 @@ impl PaneRenderer {
                 if line.content.starts_with("...") {
                     crushed_rects.push((line_idx, line_rect, line.content.clone()));
                 }
-            }
-
-            // Render crushed block lines for pure additions/deletions AFTER normal lines and store their positions
-            let mut crushed_line_rects = Vec::new();
-            for imara_block in &imara_analysis.blocks {
-                if is_left
-                    && imara_block.is_pure_insertion()
-                    && !imara_block.right_range.is_empty()
-                {
-                    // Draw 2px crushed line for pure addition in left pane (where content is missing)
-                    // Find the appropriate line position to place the crushed line
-                    let target_line_idx = imara_block.right_range.start;
-
-                    // Use actual line position if we have a corresponding line, otherwise calculate
-                    let y_position = if let Some(line_rect) = line_rects.get(target_line_idx) {
-                        line_rect.min.y
-                    } else if target_line_idx > 0 {
-                        if let Some(prev_rect) = line_rects.get(target_line_idx - 1) {
-                            prev_rect.max.y
-                        } else if let Some(first_rect) = line_rects.first() {
-                            first_rect.min.y
-                        } else {
-                            target_line_idx as f32 * theme.line_height()
-                        }
-                    } else if let Some(first_rect) = line_rects.first() {
-                        first_rect.min.y
-                    } else {
-                        target_line_idx as f32 * theme.line_height()
-                    };
-
-                    let crushed_rect = egui::Rect::from_min_max(
-                        egui::Pos2::new(0.0, y_position),
-                        egui::Pos2::new(ui.available_width(), y_position + 2.0),
-                    );
-                    let addition_color =
-                        egui::Color32::from_rgba_unmultiplied(76, 175, 80, 128);
-                    ui.painter().rect_filled(crushed_rect, 0.0, addition_color);
-
-                    // Store crushed line info for connectors
-                    crushed_line_rects.push((
-                        imara_block.right_range.start,
-                        crushed_rect,
-                        "addition".to_string(),
-                    ));
-                } else if !is_left
-                    && imara_block.is_pure_deletion()
-                    && !imara_block.left_range.is_empty()
-                {
-                    // Draw 2px crushed line for pure deletion in right pane (where content is missing)
-                    // Find the appropriate line position to place the crushed line
-                    let target_line_idx = imara_block.left_range.start;
-
-                    // Use actual line position if we have a corresponding line, otherwise calculate
-                    let y_position = if let Some(line_rect) = line_rects.get(target_line_idx) {
-                        line_rect.min.y
-                    } else if target_line_idx > 0 {
-                        if let Some(prev_rect) = line_rects.get(target_line_idx - 1) {
-                            prev_rect.max.y
-                        } else if let Some(first_rect) = line_rects.first() {
-                            first_rect.min.y
-                        } else {
-                            target_line_idx as f32 * theme.line_height()
-                        }
-                    } else if let Some(first_rect) = line_rects.first() {
-                        first_rect.min.y
-                    } else {
-                        target_line_idx as f32 * theme.line_height()
-                    };
-
-                    let crushed_rect = egui::Rect::from_min_max(
-                        egui::Pos2::new(0.0, y_position),
-                        egui::Pos2::new(ui.available_width(), y_position + 2.0),
-                    );
-                    let deletion_color =
-                        egui::Color32::from_rgba_unmultiplied(244, 67, 54, 128);
-                    ui.painter().rect_filled(crushed_rect, 0.0, deletion_color);
-
-                    // Store crushed line info for connectors
-                    crushed_line_rects.push((
-                        imara_block.left_range.start,
-                        crushed_rect,
-                        "deletion".to_string(),
-                    ));
-                }
+                line_idx += 1;
             }
 
             // Store crushed line positions for connectors
@@ -254,16 +264,14 @@ impl PaneRenderer {
                 "right_crushed_rects"
             };
             ui.ctx().memory_mut(|mem| {
-                mem.data.insert_persisted(
-                    crushed_memory_key.to_string().into(),
-                    crushed_line_rects,
-                );
+                mem.data
+                    .insert_persisted(crushed_memory_key.to_string().into(), crushed_line_rects);
             });
-
 
             // Store rectangles in memory for connector rendering
             ui.ctx().memory_mut(|mem| {
-                mem.data.insert_persisted(rects_memory_key.to_string().into(), line_rects);
+                mem.data
+                    .insert_persisted(rects_memory_key.to_string().into(), line_rects);
                 // Note: crushed_line_rects are already stored above with the correct keys
             });
         });
@@ -278,7 +286,8 @@ impl PaneRenderer {
 
         // Store scroll position in memory
         ui.ctx().memory_mut(|mem| {
-            mem.data.insert_persisted(scroll_memory_key.to_string().into(), current_scroll_offset);
+            mem.data
+                .insert_persisted(scroll_memory_key.to_string().into(), current_scroll_offset);
         });
     }
 }

@@ -1,13 +1,13 @@
 // src/ui/layout/layout_manager.rs
 // Main layout manager extracted from layout/mod.rs
 
-use eframe::egui;
-use egui::{Vec2, Pos2};
+use super::{gutter::GutterRenderer, panes::PaneRenderer};
 use crate::config::LayoutConfig;
 use crate::models::diff::MappingSegment;
 use crate::models::line::DisplayLine;
-use super::{panes::PaneRenderer, gutter::GutterRenderer};
 use crate::ui::ConnectorRenderer;
+use eframe::egui;
+use egui::{Pos2, Vec2};
 
 /// Layout manager for the diff viewer
 pub struct LayoutManager {
@@ -41,7 +41,7 @@ impl LayoutManager {
         scroll_sync: &mut crate::sync::ScrollSync,
         theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
-        _connector_renderer: &mut crate::ui::ConnectorRenderer,
+        connector_renderer: &mut crate::ui::ConnectorRenderer,
         mapping_segments: &[MappingSegment],
         imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
     ) {
@@ -55,7 +55,7 @@ impl LayoutManager {
             egui::Layout::left_to_right(egui::Align::TOP),
             |ui| {
                 ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
-                
+
                 // Left pane (original)
                 self.pane_renderer.render_left_pane(
                     ui,
@@ -95,7 +95,14 @@ impl LayoutManager {
         );
 
         // Now render connectors after both panes are rendered - use original working method
-        self.render_connectors(ui, old_lines, new_lines, pane_width, imara_analysis);
+        self.render_connectors(
+            ui,
+            &old_lines,
+            &new_lines,
+            pane_width,
+            scroll_sync,
+            imara_analysis,
+        );
     }
 
     /// Render connectors between panes (restored from original working version)
@@ -105,6 +112,7 @@ impl LayoutManager {
         old_lines: &[DisplayLine],
         new_lines: &[DisplayLine],
         pane_width: f32,
+        scroll_sync: &crate::sync::ScrollSync,
         imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
     ) {
         // Get stored rectangle positions
@@ -175,7 +183,6 @@ impl LayoutManager {
                                 // Connect from the actual crushed line position to the right block
                                 let left_x_end = gutter_x_start;
                                 let crushed_line_y = crushed_rect.min.y;
-
                                 let right_x_start = right_start_rect.min.x;
                                 let right_top_y = right_start_rect.top();
                                 let right_bottom_y = right_end_rect.bottom();
@@ -194,6 +201,50 @@ impl LayoutManager {
                                     right_top_y,
                                     right_bottom_y,
                                     addition_color,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Handle pure deletion blocks - connect to actual crushed lines in right pane
+            if let Some(right_crushed) = &right_crushed_rects {
+                for imara_block in &imara_analysis.blocks {
+                    if imara_block.is_pure_deletion() && !imara_block.left_range.is_empty() {
+                        let left_start = imara_block.left_range.start;
+                        let left_end = imara_block.left_range.end.saturating_sub(1);
+
+                        // Find corresponding crushed line
+                        if let Some((_, crushed_rect, _)) =
+                            right_crushed.iter().find(|(idx, _, _)| *idx == left_start)
+                        {
+                            if let (Some(left_start_rect), Some(left_end_rect)) =
+                                (left_rects.get(left_start), left_rects.get(left_end))
+                            {
+                                // Connect from the left block to the actual crushed line position
+                                let left_x_end = left_start_rect.max.x;
+                                let left_top_y = left_start_rect.top();
+                                let left_bottom_y = left_end_rect.bottom();
+
+                                let right_x_start =
+                                    gutter_x_start + self.config.connector_column_width;
+                                let crushed_line_y = crushed_rect.min.y;
+
+                                // Use red color for deletions with transparency
+                                let deletion_color =
+                                    egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64);
+
+                                // Draw connector from the left block to the crushed line
+                                self.draw_connector(
+                                    ui,
+                                    left_x_end,
+                                    left_top_y,
+                                    left_bottom_y,
+                                    right_x_start,
+                                    crushed_line_y,
+                                    crushed_line_y + 2.0,
+                                    deletion_color,
                                 );
                             }
                         }
