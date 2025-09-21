@@ -87,6 +87,7 @@ impl LineRenderer {
                 let final_text_color = match line.line_type {
                     LineType::Deletion => self.theme.deletion_foreground,
                     LineType::Addition => self.theme.addition_foreground,
+                    LineType::Modification => self.theme.modification_foreground,
                     _ => text_color,
                 };
 
@@ -122,6 +123,15 @@ impl LineRenderer {
                                 0.7,
                             )
                         }
+                        LineType::Modification => {
+                            // For modification lines, blend syntax color with modification foreground
+                            self.blend_colors(
+                                self.syntax_highlighter
+                                    .get_color_for_token(&token.token_type),
+                                self.theme.modification_foreground,
+                                0.7,
+                            )
+                        }
                         _ => {
                             // For context lines, use pure syntax highlighting
                             self.syntax_highlighter
@@ -153,12 +163,18 @@ impl LineRenderer {
             }
 
             // Render word-level highlights for modifications
-            if line.line_type == LineType::Context && !line.word_highlights.is_empty() {
-                for (start, end) in &line.word_highlights {
-                    if *start < line.content.len() && *end <= line.content.len() && *start < *end {
+            if (line.line_type == LineType::Context || line.line_type == LineType::Modification)
+                && !line.word_highlights.is_empty()
+            {
+                let char_count = line.content.chars().count();
+                for (start, end, highlight_type) in &line.word_highlights {
+                    let char_start = line.content[..*start].chars().count();
+                    let char_end = line.content[..*end].chars().count();
+                    if char_start < char_count && char_end <= char_count && char_start < char_end {
                         let char_width = self.theme.char_width(); // Use Zed-calculated character width
-                        let highlight_start_x = 60.0 + (*start as f32 * char_width);
-                        let highlight_width = (*end - *start) as f32 * char_width;
+                        let highlight_start_x =
+                            60.0 + (char_start as f32 * char_width) - (1.5 * char_width);
+                        let highlight_width = (char_end - char_start) as f32 * char_width;
 
                         // Standardized positioning calculation for both panes
                         let highlight_rect = Rect::from_min_size(
@@ -169,12 +185,17 @@ impl LineRenderer {
                             egui::Vec2::new(highlight_width, line_height - 4.0),
                         );
 
-                        // Word-level highlight with improved JetBrains colors
-                        // Use theme-based color for all word highlights
+                        // Word-level highlight with JetBrains colors
+                        let base_color = match highlight_type {
+                            crate::models::line::HighlightType::Insert => {
+                                self.theme.addition_foreground
+                            }
+                            crate::models::line::HighlightType::Delete => self.theme.color_blue_500,
+                        };
                         let highlight_color = Color32::from_rgba_unmultiplied(
-                            self.theme.color_blue_500.r(),
-                            self.theme.color_blue_500.g(),
-                            self.theme.color_blue_500.b(),
+                            base_color.r(),
+                            base_color.g(),
+                            base_color.b(),
                             64,
                         );
 
