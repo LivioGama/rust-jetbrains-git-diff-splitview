@@ -3,6 +3,7 @@ use egui::{FontData, FontDefinitions, FontFamily, FontId};
 use std::result::Result;
 
 /// Zed IDE font specifications from source code
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ZedFontConfig {
     // Buffer/Editor fonts - from crates/theme/src/settings.rs
@@ -32,16 +33,12 @@ pub struct ZedFontConfig {
 #[derive(Debug, Clone, PartialEq)]
 pub enum LineHeightMode {
     Comfortable, // 1.618 (golden ratio)
-    Standard,    // 1.3
-    Custom(f32), // custom value
 }
 
 impl LineHeightMode {
     pub fn to_multiplier(&self) -> f32 {
         match self {
             LineHeightMode::Comfortable => 1.618,
-            LineHeightMode::Standard => 1.3,
-            LineHeightMode::Custom(value) => *value,
         }
     }
 }
@@ -139,6 +136,7 @@ impl ZedFontConfig {
 }
 
 /// Font manager for loading and configuring fonts
+#[allow(dead_code)]
 pub struct ZedFontManager {
     config: ZedFontConfig,
     font_definitions: FontDefinitions,
@@ -285,10 +283,10 @@ impl ZedFontManager {
     /// Load embedded fonts with proper error handling
     fn try_load_embedded_fonts(font_definitions: &mut FontDefinitions) -> bool {
         let mut fonts_loaded = 0;
-        let mut total_fonts = 0;
+        let mut _total_fonts = 0;
 
         // Try to load embedded Lilex font (used as Zed Mono replacement)
-        total_fonts += 1;
+        _total_fonts += 1;
         match load_lilex_font() {
             Ok(lilex_data) => {
                 font_definitions
@@ -300,7 +298,7 @@ impl ZedFontManager {
         }
 
         // Try to load embedded IBM Plex Sans font
-        total_fonts += 1;
+        _total_fonts += 1;
         match load_ibm_plex_sans_font() {
             Ok(plex_sans_data) => {
                 font_definitions.font_data.insert(
@@ -347,11 +345,6 @@ fn load_ibm_plex_sans_font() -> Result<&'static [u8], String> {
 pub struct FontMetrics;
 
 impl FontMetrics {
-    /// Calculate optimal line height based on font size and mode
-    pub fn calculate_line_height(font_size: f32, mode: &LineHeightMode) -> f32 {
-        font_size * mode.to_multiplier()
-    }
-
     /// Calculate character width approximation for monospace fonts
     pub fn approximate_char_width(font_size: f32) -> f32 {
         // Rough approximation: monospace character width is typically ~0.6 * font_size

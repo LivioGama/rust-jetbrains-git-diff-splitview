@@ -10,6 +10,7 @@ pub use editor_settings::*;
 pub use fonts::*;
 
 /// Application configuration
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     pub layout: LayoutConfig,
@@ -40,16 +41,6 @@ impl Default for AppConfig {
             fonts: ZedFontConfig::default(),
             editor: ZedSettings::default(),
         }
-    }
-}
-
-/// Navigation configuration
-#[derive(Debug, Clone)]
-pub struct NavigationConfig {}
-
-impl Default for NavigationConfig {
-    fn default() -> Self {
-        Self {}
     }
 }
 

@@ -1,8 +1,8 @@
 // src/rendering/highlight_renderer.rs
 // Highlight renderer extracted from rendering/mod.rs
 
-use egui::{Color32, Rect};
 use crate::theme::JetBrainsTheme;
+use egui::{Color32, Rect};
 
 /// Highlight renderer for JetBrains-style highlights
 pub struct HighlightRenderer {
@@ -39,15 +39,10 @@ impl HighlightRenderer {
                 // Blue background for modifications
                 self.theme.modification_background
             }
-            _ => Color32::TRANSPARENT,
         };
 
         if highlight_color != Color32::TRANSPARENT {
             ui.painter().rect_filled(rect, 0.0, highlight_color);
         }
-    }
-
-    pub fn update_theme(&mut self, theme: JetBrainsTheme) {
-        self.theme = theme;
     }
 }

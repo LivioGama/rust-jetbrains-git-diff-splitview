@@ -127,7 +127,7 @@ impl PaneRenderer {
         ui: &mut egui::Ui,
         lines: &[DisplayLine],
         scroll_sync: &mut crate::sync::ScrollSync,
-        theme: &crate::theme::JetBrainsTheme,
+        _theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
         is_left: bool,
         scroll_id: &str,

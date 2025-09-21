@@ -245,7 +245,6 @@ impl ConnectorRenderer {
         _painter: &egui::Painter,
         _start_point: Pos2,
         _end_point: Pos2,
-        _config: &crate::models::ui::ConnectorConfig,
         _color: Color32,
         _is_multi_line: bool,
     ) {

@@ -15,7 +15,11 @@ impl WindowConfig {
                 .with_resizable(true)
                 .with_visible(true)
                 .with_transparent(false)
-                .with_decorations(true)
+                .with_decorations(cfg!(not(any(
+                    target_os = "ios",
+                    target_os = "android",
+                    target_arch = "wasm32"
+                ))))
                 .with_window_level(egui::WindowLevel::Normal),
             centered: true,
             // Add hardware acceleration settings for better compatibility

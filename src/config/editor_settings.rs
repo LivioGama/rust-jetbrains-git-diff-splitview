@@ -2,232 +2,103 @@
 // From crates/editor/src/editor_settings.rs and crates/language/src/language_settings.rs
 
 /// Editor behavior settings matching Zed's defaults
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ZedEditorSettings {
-    // Cursor and Selection
-    pub cursor_blink: bool,                           // Default true
-    pub current_line_highlight: CurrentLineHighlight, // Default All
-    pub selection_highlight: bool,                    // Default true
-    pub rounded_selection: bool,                      // Default true
-    pub relative_line_numbers: bool,                  // Default false
-
-    // Hover and Popover
-    pub hover_popover_enabled: bool,    // Default true
-    pub hover_popover_delay_ms: u32,    // Default 300ms
-    pub lsp_highlight_debounce_ms: u32, // Default 75ms
-
-    // Scrolling
-    pub scroll_beyond_last_line: ScrollBeyondLastLine, // Default OnePagep
-    pub vertical_scroll_margin: u32,                   // Default 3 lines
-    pub horizontal_scroll_margin: u32,                 // Default 5 characters
-    pub scroll_sensitivity: f32,                       // Default 1.0
-    pub fast_scroll_sensitivity: f32,                  // Default 4.0 (with alt/option)
-
-    // Search
-    pub search_wrap: bool,                              // Default true
-    pub seed_search_query_from_cursor: SeedSearchQuery, // Default Always
-
-    // Input and Interaction
-    pub middle_click_paste: bool,                   // Default true
-    pub multi_cursor_modifier: MultiCursorModifier, // Default Alt
-    pub drag_and_drop_selection: bool,              // Default true
-    pub drag_and_drop_delay_ms: u32,                // Default 300ms
-
-    // Code Actions and LSP
-    pub auto_signature_help: bool,             // Default false
-    pub show_signature_help_after_edits: bool, // Default false
-    pub go_to_definition_fallback: GoToDefinitionFallback, // Default FindAllReferences
-    pub inline_code_actions: bool,             // Default true
-    pub lsp_document_colors: LspDocumentColors, // Default Inlay
-
-    // Visual
-    pub minimum_contrast_for_highlights: u8, // Default 45 (APCA perceptual contrast)
+    pub cursor_blink: bool,
+    pub vertical_scroll_margin: u32,
+    pub horizontal_scroll_margin: u32,
+    pub scroll_sensitivity: f32,
 }
 
 /// Current line highlight options
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum CurrentLineHighlight {
-    None,
-    Gutter,
-    Line,
     All, // Default
-}
-
-impl CurrentLineHighlight {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "none" => Self::None,
-            "gutter" => Self::Gutter,
-            "line" => Self::Line,
-            "all" => Self::All,
-            _ => Self::All, // Default fallback
-        }
-    }
-
-    pub fn to_str(&self) -> &'static str {
-        match self {
-            Self::None => "none",
-            Self::Gutter => "gutter",
-            Self::Line => "line",
-            Self::All => "all",
-        }
-    }
 }
 
 /// Scroll beyond last line options
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum ScrollBeyondLastLine {
-    Off,
     OnePage, // Default
-    VerticalScrollMargin,
-}
-
-impl ScrollBeyondLastLine {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "off" => Self::Off,
-            "one_page" => Self::OnePage,
-            "vertical_scroll_margin" => Self::VerticalScrollMargin,
-            _ => Self::OnePage, // Default fallback
-        }
-    }
 }
 
 /// Multi-cursor modifier key
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum MultiCursorModifier {
     Alt, // Default
-    Cmd,
-    Ctrl,
 }
 
 /// Seed search query behavior
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum SeedSearchQuery {
-    Never,
-    Selection,
     Always, // Default
 }
 
 /// Go to definition fallback behavior
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum GoToDefinitionFallback {
-    None,
     FindAllReferences, // Default
 }
 
 /// LSP document colors display mode
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum LspDocumentColors {
-    None,
     Inlay, // Default
-    Border,
-    Background,
 }
 
 impl Default for ZedEditorSettings {
     fn default() -> Self {
         Self {
-            // Cursor and Selection - exact Zed defaults
             cursor_blink: true,
-            current_line_highlight: CurrentLineHighlight::All,
-            selection_highlight: true,
-            rounded_selection: true,
-            relative_line_numbers: false,
-
-            // Hover and Popover
-            hover_popover_enabled: true,
-            hover_popover_delay_ms: 300,
-            lsp_highlight_debounce_ms: 75,
-
-            // Scrolling
-            scroll_beyond_last_line: ScrollBeyondLastLine::OnePage,
             vertical_scroll_margin: 3,
             horizontal_scroll_margin: 5,
             scroll_sensitivity: 1.0,
-            fast_scroll_sensitivity: 4.0,
-
-            // Search
-            search_wrap: true,
-            seed_search_query_from_cursor: SeedSearchQuery::Always,
-
-            // Input and Interaction
-            middle_click_paste: true,
-            multi_cursor_modifier: MultiCursorModifier::Alt,
-            drag_and_drop_selection: true,
-            drag_and_drop_delay_ms: 300,
-
-            // Code Actions and LSP
-            auto_signature_help: false,
-            show_signature_help_after_edits: false,
-            go_to_definition_fallback: GoToDefinitionFallback::FindAllReferences,
-            inline_code_actions: true,
-            lsp_document_colors: LspDocumentColors::Inlay,
-
-            // Visual
-            minimum_contrast_for_highlights: 45,
         }
     }
 }
 
 /// Language/Buffer settings matching Zed's defaults
 /// From crates/language/src/language_settings.rs
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ZedLanguageSettings {
     // Indentation
     pub tab_size: u32,   // Default 4 columns
     pub hard_tabs: bool, // Default false (uses spaces)
-
-    // Line wrapping
-    pub preferred_line_length: u32, // Default 80 columns
-    pub soft_wrap: SoftWrap,        // Default None
-    pub show_wrap_guides: bool,     // Default true
-
-    // Formatting
-    pub format_on_save: FormatOnSave,             // Default On
-    pub remove_trailing_whitespace_on_save: bool, // Default true
-    pub ensure_final_newline_on_save: bool,       // Default true
 }
 
 /// Soft wrap options
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum SoftWrap {
     None, // Default
-    EditorWidth,
-    PreferredLineLength,
-    Bounded,
 }
 
 /// Format on save options
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum FormatOnSave {
-    Off,
     On, // Default
-    External,
-    LanguageServer,
 }
 
 impl Default for ZedLanguageSettings {
     fn default() -> Self {
         Self {
-            // Indentation - exact Zed defaults
             tab_size: 4,
             hard_tabs: false, // Uses spaces by default
-
-            // Line wrapping
-            preferred_line_length: 80,
-            soft_wrap: SoftWrap::None,
-            show_wrap_guides: true,
-
-            // Formatting
-            format_on_save: FormatOnSave::On,
-            remove_trailing_whitespace_on_save: true,
-            ensure_final_newline_on_save: true,
         }
     }
 }
 
 /// Complete Zed settings configuration
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ZedSettings {
     pub editor: ZedEditorSettings,
@@ -243,6 +114,7 @@ impl Default for ZedSettings {
     }
 }
 
+#[allow(dead_code)]
 impl ZedSettings {
     /// Create new Zed settings with defaults
     pub fn new() -> Self {
@@ -254,7 +126,6 @@ impl ZedSettings {
         &self.editor
     }
 
-    /// Get language settings
     pub fn language(&self) -> &ZedLanguageSettings {
         &self.language
     }

@@ -1,6 +1,6 @@
+#[allow(dead_code)]
 // diffsplit/src/models/line/mod.rs
 // Line-related data structures and types
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum HighlightType {
     Insert,
@@ -13,7 +13,6 @@ pub enum LineType {
     Addition,
     Deletion,
     Modification,
-    Empty,
 }
 
 #[derive(Debug, Clone)]
@@ -37,19 +36,6 @@ impl DisplayLine {
     pub fn with_line_number(mut self, line_num: usize) -> Self {
         self.original_line_num = Some(line_num);
         self
-    }
-
-    pub fn with_word_highlights(mut self, highlights: Vec<(usize, usize, HighlightType)>) -> Self {
-        self.word_highlights = highlights;
-        self
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.content.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.content.len()
     }
 }
 

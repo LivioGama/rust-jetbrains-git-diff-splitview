@@ -4,9 +4,7 @@ pub mod colors;
 pub mod highlighter;
 pub mod token_types;
 
-pub use colors::*;
 pub use highlighter::*;
-pub use token_types::*;
 
 #[cfg(test)]
 mod tests {

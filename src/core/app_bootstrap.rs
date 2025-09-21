@@ -4,10 +4,9 @@
 use crate::actions::ActionHandler;
 use crate::app::DiffViewerApp;
 use crate::config::{ConfigManager, WindowConfig};
-use crate::diff::imara::compute_imara_diff_default;
-use crate::diff::parser::create_complete_side_by_side_with_diff;
+
 use crate::file_ops::FileOps;
-use crate::git::{GitOps, GitResult};
+use crate::git::GitOps;
 use crate::state::StateManager;
 use crate::sync;
 
@@ -25,7 +24,7 @@ impl AppBootstrap {
     pub fn initialize() -> Result<Self, eframe::Error> {
         println!("📊 Initializing Git operations and file operations...");
         let git_ops = GitOps::with_current_dir();
-        let file_ops = FileOps::with_default_config();
+        let _file_ops = FileOps::with_default_config();
 
         // Get list of changed files from git diff
         println!("📋 Scanning for changed files in git diff...");
@@ -41,7 +40,7 @@ impl AppBootstrap {
         let action_handler = ActionHandler::new();
 
         // Determine which file to load
-        let (file_path, original_commit, current_path) = if !project_files.is_empty() {
+        let (_file_path, _original_commit, _current_path) = if !project_files.is_empty() {
             let first_file = &project_files[0];
             let file_path_str = first_file.to_string_lossy().to_string();
             println!("🎯 Loading first changed file: {}", file_path_str);
@@ -102,12 +101,7 @@ impl AppBootstrap {
             state.left_lines = Vec::new();
             state.right_lines = Vec::new();
             state.change_blocks = Vec::new();
-            state.imara_analysis = crate::diff::imara::ImaraDiffAnalysis {
-                blocks: Vec::new(),
-                line_mapping: Vec::new(),
-                total_old_lines: 0,
-                total_new_lines: 0,
-            };
+            state.imara_analysis = crate::diff::imara::ImaraDiffAnalysis { blocks: Vec::new() };
             state.anchors = Vec::new();
             state.mapping_segments = Vec::new();
         });

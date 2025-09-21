@@ -131,27 +131,22 @@ impl JetBrainsTheme {
 
     /// Check if cursor should blink based on Zed settings
     pub fn cursor_should_blink(&self) -> bool {
-        self.editor_settings.editor.cursor_blink
+        self.editor_settings.editor().cursor_blink
     }
 
     /// Get vertical scroll margin from Zed settings
     pub fn vertical_scroll_margin(&self) -> u32 {
-        self.editor_settings.editor.vertical_scroll_margin
+        self.editor_settings.editor().vertical_scroll_margin
     }
 
     /// Get horizontal scroll margin from Zed settings
     pub fn horizontal_scroll_margin(&self) -> u32 {
-        self.editor_settings.editor.horizontal_scroll_margin
+        self.editor_settings.editor().horizontal_scroll_margin
     }
 
     /// Get scroll sensitivity from Zed settings
     pub fn scroll_sensitivity(&self) -> f32 {
-        self.editor_settings.editor.scroll_sensitivity
-    }
-
-    /// Check if relative line numbers should be shown
-    pub fn show_relative_line_numbers(&self) -> bool {
-        self.editor_settings.editor.relative_line_numbers
+        self.editor_settings.editor().scroll_sensitivity
     }
 
     /// Get tab size from Zed language settings
@@ -162,11 +157,6 @@ impl JetBrainsTheme {
     /// Check if hard tabs should be used
     pub fn use_hard_tabs(&self) -> bool {
         self.editor_settings.language.hard_tabs
-    }
-
-    /// Get preferred line length for wrapping
-    pub fn preferred_line_length(&self) -> u32 {
-        self.editor_settings.language.preferred_line_length
     }
 
     pub fn get_connector_color(&self, line_type: &crate::models::line::LineType) -> Color32 {
@@ -184,7 +174,6 @@ impl JetBrainsTheme {
             crate::models::line::LineType::Deletion => self.deletion_background,
             crate::models::line::LineType::Modification => self.modification_background,
             crate::models::line::LineType::Context => Color32::TRANSPARENT,
-            crate::models::line::LineType::Empty => Color32::TRANSPARENT,
         }
     }
 
@@ -203,7 +192,7 @@ impl JetBrainsTheme {
             terminal_font_size: 14.0,
             terminal_line_height: 14.0 * 1.3,
             ligatures_enabled: false,
-            line_height_mode: LineHeightMode::Standard,
+            line_height_mode: LineHeightMode::Comfortable,
         };
 
         let editor_settings = ZedSettings::default();

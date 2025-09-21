@@ -137,24 +137,6 @@ pub fn create_complete_side_by_side_with_diff(
                     }
                 }
             }
-            _ => {
-                // Fallback to original behavior for other operations
-                if !imara_block.left_range.is_empty() {
-                    for line_idx in imara_block.left_range.clone() {
-                        if line_idx < left_display_lines.len() {
-                            left_display_lines[line_idx].line_type = LineType::Deletion;
-                        }
-                    }
-                }
-
-                if !imara_block.right_range.is_empty() {
-                    for line_idx in imara_block.right_range.clone() {
-                        if line_idx < right_display_lines.len() {
-                            right_display_lines[line_idx].line_type = LineType::Addition;
-                        }
-                    }
-                }
-            }
         }
     }
 
