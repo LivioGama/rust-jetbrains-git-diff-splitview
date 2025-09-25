@@ -1,11 +1,12 @@
-// src/ui/layout/panes.rs
-// Pane rendering logic extracted from layout/mod.rs
-
+// Pane rendering logic - GPUI Native Implementation
+use super::connectors::ConnectorState;
 use crate::config::LayoutConfig;
 use crate::models::diff::MappingSegment;
 use crate::models::line::DisplayLine;
-use eframe::egui;
-use egui::{FontId, ScrollArea, Vec2};
+use crate::sync::{map_left_to_right, map_right_to_left};
+use gpui::ScrollDelta;
+use gpui::*;
+use std::sync::Arc;
 
 /// Pane rendering functionality for the layout manager
 pub struct PaneRenderer {
@@ -17,277 +18,245 @@ impl PaneRenderer {
         Self { config }
     }
 
-    /// Render the left pane (original file)
-    pub fn render_left_pane(
+    /// Render a pane using GPUI elements
+    pub fn render_pane_gpui(
         &self,
-        ui: &mut egui::Ui,
-        old_lines: &[DisplayLine],
-        scroll_sync: &mut crate::sync::ScrollSync,
-        theme: &crate::theme::JetBrainsTheme,
-        line_renderer: &mut crate::ui::LineRenderer,
-        pane_width: f32,
-        total_height: f32,
-        mapping_segments: &[MappingSegment],
-        imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
-    ) {
-        ui.allocate_ui_with_layout(
-            Vec2::new(pane_width, total_height),
-            egui::Layout::top_down(egui::Align::LEFT),
-            |ui| {
-                ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
-                ui.style_mut().spacing.indent = 0.0;
-                // Header
-                self.render_pane_header(ui, "Original", theme);
-
-                ui.separator();
-
-                // Content area with scrolling
-                self.render_scrollable_content(
-                    ui,
-                    old_lines,
-                    scroll_sync,
-                    theme,
-                    line_renderer,
-                    true,
-                    "diff_left_scroll",
-                    "left_scroll",
-                    "left_rects",
-                    mapping_segments,
-                    imara_analysis,
-                );
-            },
-        );
-    }
-
-    /// Render the right pane (modified file)
-    pub fn render_right_pane(
-        &self,
-        ui: &mut egui::Ui,
-        new_lines: &[DisplayLine],
-        scroll_sync: &mut crate::sync::ScrollSync,
-        theme: &crate::theme::JetBrainsTheme,
-        line_renderer: &mut crate::ui::LineRenderer,
-        pane_width: f32,
-        total_height: f32,
-        mapping_segments: &[MappingSegment],
-        imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
-    ) {
-        ui.allocate_ui_with_layout(
-            Vec2::new(pane_width, total_height),
-            egui::Layout::top_down(egui::Align::LEFT),
-            |ui| {
-                ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
-                ui.style_mut().spacing.indent = 0.0;
-                // Header
-                self.render_pane_header(ui, "Modified", theme);
-
-                ui.separator();
-
-                // Content area with scrolling
-                self.render_scrollable_content(
-                    ui,
-                    new_lines,
-                    scroll_sync,
-                    theme,
-                    line_renderer,
-                    false,
-                    "diff_right_scroll",
-                    "right_scroll",
-                    "right_rects",
-                    mapping_segments,
-                    imara_analysis,
-                );
-            },
-        );
-    }
-
-    /// Render a pane header
-    pub fn render_pane_header(
-        &self,
-        ui: &mut egui::Ui,
         title: &str,
-        theme: &crate::theme::JetBrainsTheme,
-    ) {
-        ui.horizontal(|ui| {
-            ui.add_space(self.config.pane_padding);
-            ui.label(
-                egui::RichText::new(title)
-                    .font(FontId::new(
-                        theme.ui_font_size() * 1.1,
-                        egui::FontFamily::Proportional,
-                    ))
-                    .color(theme.foreground),
-            );
-        });
-    }
-
-    /// Render scrollable content area
-    pub fn render_scrollable_content(
-        &self,
-        ui: &mut egui::Ui,
         lines: &[DisplayLine],
         scroll_sync: &mut crate::sync::ScrollSync,
-        _theme: &crate::theme::JetBrainsTheme,
+        theme: &crate::theme::JetBrainsTheme,
+        line_renderer: &mut crate::ui::LineRenderer,
+        _pane_width: Pixels,
+        mapping_segments: &[MappingSegment],
+        _imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
+        is_left: bool,
+        _left_scroll: f32,
+        _right_scroll: f32,
+        connector_state: &mut ConnectorState,
+    ) -> impl IntoElement {
+        let title = title.to_string();
+
+        div()
+            .flex()
+            .flex_col()
+            .h_full() // Take full height of parent
+            .w_full() // Take full width of parent
+            .children(vec![
+                // Header
+                div()
+                    .flex()
+                    .px(px(self.config.pane_padding))
+                    .py(px(4.0))
+                    .child(div().text_sm().text_color(theme.foreground).child(title))
+                    .into_any_element(),
+                // Separator
+                div().h(px(1.0)).bg(rgb(0x3c3c3c)).into_any_element(),
+                // Content area with scrolling container - takes remaining space
+                div()
+                    .flex_1()
+                    .h_0() // Let flex determine height but start from 0
+                    .min_h_0() // Allow shrinking if needed
+                    .overflow_hidden() // Ensure proper containment
+                    .child(self.render_scrollable_content_gpui(
+                        lines,
+                        theme,
+                        line_renderer,
+                        is_left,
+                        scroll_sync,
+                        connector_state,
+                        mapping_segments,
+                    ))
+                    .into_any_element(),
+            ])
+    }
+
+    /// Render scrollable content area using GPUI elements with synchronization
+    pub fn render_scrollable_content_gpui(
+        &self,
+        lines: &[DisplayLine],
+        theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
         is_left: bool,
-        scroll_id: &str,
-        scroll_memory_key: &str,
-        rects_memory_key: &str,
-        _mapping_segments: &[MappingSegment],
-        imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
-    ) {
-        let available_height = ui.available_height();
+        scroll_sync: &mut crate::sync::ScrollSync,
+        connector_state: &mut ConnectorState,
+        mapping_segments: &[MappingSegment],
+    ) -> impl IntoElement {
+        let scroll_id = if is_left {
+            "left_pane_scroll"
+        } else {
+            "right_pane_scroll"
+        };
+        let pane_label = if is_left { "left" } else { "right" };
+        let current_scroll_offset = if is_left {
+            scroll_sync.get_left_scroll()
+        } else {
+            scroll_sync.get_right_scroll()
+        };
+        if is_left {
+            connector_state.left_scroll_offset = current_scroll_offset;
+        } else {
+            connector_state.right_scroll_offset = current_scroll_offset;
+        }
+        eprintln!(
+            "[DEBUG] render_scrollable_content_gpui pane={} scroll_offset={:.1}",
+            pane_label, current_scroll_offset
+        );
+        let theme_clone = theme.clone();
+        let is_left_clone = is_left;
+        let scroll_sync_ptr = scroll_sync as *mut crate::sync::ScrollSync;
 
-        // Create scroll area for this pane
-        let scroll_area = ScrollArea::vertical()
-            .id_salt(scroll_id)
-            .auto_shrink([false, false])
-            .max_height(available_height)
-            .stick_to_bottom(false);
+        let line_height = theme.line_height();
+        let content_height = lines.len() as f32 * line_height;
+        let max_scroll_offset = (content_height - line_height).max(0.0);
 
-        let scroll_area_response = scroll_area.show(ui, |ui| {
-            // Store line rectangles for connector calculations
-            let mut line_rects = Vec::new();
-            let mut crushed_rects = Vec::new();
-            let mut crushed_line_rects = Vec::new();
+        let mapping_segments_arc = Arc::new(mapping_segments.to_vec());
+        let has_mapping_segments = !mapping_segments_arc.is_empty();
+        let mapping_segments_for_closure = Arc::clone(&mapping_segments_arc);
 
-            ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
-
-            // Create a combined rendering plan that includes both normal lines and crushed blocks in proper sequence
-            let mut line_idx = 0;
-
-            // Process each imara block to determine where crushed blocks should be inserted
-            for imara_block in &imara_analysis.blocks {
-                // Render normal lines up to this block's position
-                let target_line_end = if is_left {
-                    if imara_block.is_pure_insertion() {
-                        // For pure insertions in left pane, render lines up to the insertion point
-                        imara_block.right_range.start.saturating_sub(
-                            imara_analysis
-                                .blocks
-                                .iter()
-                                .filter(|b| {
-                                    b.right_range.end <= imara_block.right_range.start
-                                        && b.is_pure_insertion()
-                                })
-                                .map(|b| b.right_range.len())
-                                .sum::<usize>(),
-                        )
-                    } else {
-                        imara_block.left_range.end
+        div()
+            .id(scroll_id)
+            .h_full()
+            .w_full()
+            .bg(theme.background)
+            .overflow_y_scroll()
+            .on_scroll_wheel(move |event, _phase, _cx| {
+                if scroll_sync_ptr.is_null() {
+                    return;
+                }
+                let delta = match event.delta {
+                    ScrollDelta::Pixels(delta) => delta.y.0,
+                    ScrollDelta::Lines(delta) => delta.y * line_height,
+                };
+                if delta == 0.0 {
+                    return;
+                }
+                let scroll_sync_ref = unsafe { &mut *scroll_sync_ptr };
+                if is_left_clone {
+                    let current = scroll_sync_ref.get_left_scroll();
+                    let next = (current + delta).clamp(0.0, max_scroll_offset);
+                    if scroll_sync_ref.update_left_scroll(next) {
+                        if has_mapping_segments {
+                            let segments = mapping_segments_for_closure.clone();
+                            scroll_sync_ref.synchronize_scrolls(move |y| {
+                                map_left_to_right(y, segments.as_slice())
+                            });
+                        } else {
+                            scroll_sync_ref.synchronize_scrolls(|y| y);
+                        }
                     }
                 } else {
-                    if imara_block.is_pure_deletion() {
-                        // For pure deletions in right pane, render lines up to the deletion point
-                        imara_block.left_range.start.saturating_sub(
-                            imara_analysis
-                                .blocks
-                                .iter()
-                                .filter(|b| {
-                                    b.left_range.end <= imara_block.left_range.start
-                                        && b.is_pure_deletion()
-                                })
-                                .map(|b| b.left_range.len())
-                                .sum::<usize>(),
-                        )
-                    } else {
-                        imara_block.right_range.end
-                    }
-                };
-
-                // Render normal lines up to the target position
-                while line_idx < target_line_end.min(lines.len()) {
-                    let line = &lines[line_idx];
-                    let line_rect = line_renderer.render_line(ui, line, line_idx, is_left);
-                    line_rects.push(line_rect);
-
-                    // Track crushed lines for pure insertion handling
-                    if line.content.starts_with("...") {
-                        crushed_rects.push((line_idx, line_rect, line.content.clone()));
-                    }
-                    line_idx += 1;
-                }
-
-                // Insert crushed block if needed
-                if (is_left
-                    && imara_block.is_pure_insertion()
-                    && !imara_block.right_range.is_empty())
-                    || (!is_left
-                        && imara_block.is_pure_deletion()
-                        && !imara_block.left_range.is_empty())
-                {
-                    // Allocate space for the crushed block within the UI layout
-                    let (crushed_rect, _response) = ui.allocate_exact_size(
-                        egui::Vec2::new(ui.available_width(), 2.0),
-                        egui::Sense::hover(),
-                    );
-
-                    let (color, block_type, block_idx) =
-                        if is_left && imara_block.is_pure_insertion() {
-                            (
-                                egui::Color32::from_rgba_unmultiplied(76, 175, 80, 128),
-                                "addition",
-                                imara_block.right_range.start,
-                            )
+                    let current = scroll_sync_ref.get_right_scroll();
+                    let next = (current + delta).clamp(0.0, max_scroll_offset);
+                    if scroll_sync_ref.update_right_scroll(next) {
+                        if has_mapping_segments {
+                            let segments = mapping_segments_for_closure.clone();
+                            scroll_sync_ref.synchronize_scrolls(move |y| {
+                                map_right_to_left(y, segments.as_slice())
+                            });
                         } else {
-                            (
-                                egui::Color32::from_rgba_unmultiplied(244, 67, 54, 128),
-                                "deletion",
-                                imara_block.left_range.start,
-                            )
+                            scroll_sync_ref.synchronize_scrolls(|y| y);
+                        }
+                    }
+                }
+            })
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .w_full()
+                    .min_w_0()
+                    .h(px(content_height))
+                    .relative()
+                    .child({
+                        self.calculate_and_store_rectangles(lines, theme, is_left, connector_state);
+                        let stored_rect_count = if is_left {
+                            connector_state.left_rects.len()
+                        } else {
+                            connector_state.right_rects.len()
                         };
+                        eprintln!(
+                            "[DEBUG] calculate_and_store_rectangles pane={} stored_rectangles={}",
+                            pane_label, stored_rect_count
+                        );
 
-                    ui.painter().rect_filled(crushed_rect, 0.0, color);
+                        div().flex().flex_col().w_full().children(
+                            lines
+                                .iter()
+                                .enumerate()
+                                .map(|(idx, line)| {
+                                    line_renderer
+                                        .render_line_gpui(line, idx, is_left_clone, &theme_clone)
+                                        .into_any_element()
+                                })
+                                .collect::<Vec<_>>(),
+                        )
+                    }),
+            )
+    }
 
-                    // Store crushed line info for connectors
-                    crushed_line_rects.push((block_idx, crushed_rect, block_type.to_string()));
-                }
+    /// Calculate line rectangle positions and store them in ConnectorState for connector rendering
+    fn calculate_and_store_rectangles(
+        &self,
+        lines: &[DisplayLine],
+        theme: &crate::theme::JetBrainsTheme,
+        is_left: bool,
+        connector_state: &mut ConnectorState,
+    ) {
+        let line_height = theme.line_height();
+        let vertical_padding = 4.0;
+        let line_stride = line_height + vertical_padding;
+        let pane_label = if is_left { "left" } else { "right" };
+        eprintln!(
+            "[DEBUG] calculate_and_store_rectangles pane={} line_height={:.1} line_stride={:.1}",
+            pane_label, line_height, line_stride
+        );
+        let pane_padding = self.config.pane_padding;
+
+        // Calculate rectangles for each line
+        let mut rectangles = Vec::new();
+        let mut crushed_rectangles = Vec::new();
+
+        for (idx, line) in lines.iter().enumerate() {
+            // Y position should be relative to content area (scroll container)
+            // Connectors align with content, not absolute page position
+            let y_position = idx as f32 * line_stride;
+            let line_width = 400.0; // Default line width - will be adjusted by layout
+
+            // Rectangle position relative to content area for connector alignment
+            let rect = gpui::Bounds::new(
+                gpui::point(px(pane_padding), px(y_position)),
+                gpui::size(px(line_width), px(line_stride)),
+            );
+
+            rectangles.push(rect);
+
+            // Handle crushed lines for large pure insertions/deletions
+            // This is a simplified version - in practice, crushed lines would be identified
+            // by analyzing the diff blocks and determining which lines to "crush"
+            if self.should_create_crushed_line(line, idx) {
+                let crushed_rect = gpui::Bounds::new(
+                    gpui::point(px(pane_padding), px(y_position)),
+                    gpui::size(px(20.0), px(2.0)), // Small crushed indicator
+                );
+                crushed_rectangles.push((idx, crushed_rect, line.content.clone()));
             }
-
-            // Render any remaining normal lines
-            while line_idx < lines.len() {
-                let line = &lines[line_idx];
-                let line_rect = line_renderer.render_line(ui, line, line_idx, is_left);
-                line_rects.push(line_rect);
-
-                // Track crushed lines for pure insertion handling
-                if line.content.starts_with("...") {
-                    crushed_rects.push((line_idx, line_rect, line.content.clone()));
-                }
-                line_idx += 1;
-            }
-
-            // Store crushed line positions for connectors
-            let crushed_memory_key = if is_left {
-                "left_crushed_rects"
-            } else {
-                "right_crushed_rects"
-            };
-            ui.ctx().memory_mut(|mem| {
-                mem.data
-                    .insert_persisted(crushed_memory_key.to_string().into(), crushed_line_rects);
-            });
-
-            // Store rectangles in memory for connector rendering
-            ui.ctx().memory_mut(|mem| {
-                mem.data
-                    .insert_persisted(rects_memory_key.to_string().into(), line_rects);
-                // Note: crushed_line_rects are already stored above with the correct keys
-            });
-        });
-
-        // Update scroll synchronization
-        let current_scroll_offset = scroll_area_response.state.offset.y;
-        if is_left {
-            scroll_sync.set_left_scroll(current_scroll_offset);
-        } else {
-            scroll_sync.set_right_scroll(current_scroll_offset);
         }
 
-        // Store scroll position in memory
-        ui.ctx().memory_mut(|mem| {
-            mem.data
-                .insert_persisted(scroll_memory_key.to_string().into(), current_scroll_offset);
-        });
+        // Store rectangles in connector state
+        if is_left {
+            connector_state.store_left_rects(rectangles.clone());
+            connector_state.store_left_crushed_rects(crushed_rectangles);
+        } else {
+            connector_state.store_right_rects(rectangles.clone());
+            connector_state.store_right_crushed_rects(crushed_rectangles);
+        }
+    }
+
+    /// Determine if a line should have a crushed representation
+    /// This is a placeholder implementation - real logic would analyze diff blocks
+    fn should_create_crushed_line(&self, _line: &DisplayLine, _idx: usize) -> bool {
+        // For now, don't create crushed lines - this would be implemented
+        // based on imara diff analysis to identify large pure insertions/deletions
+        false
     }
 }

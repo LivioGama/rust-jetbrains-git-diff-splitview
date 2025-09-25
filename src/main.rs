@@ -1,8 +1,9 @@
 // jetbrains_diff_step_by_step2/src/main.rs
-// Main entry point for the JetBrains Diff Viewer
+// Main entry point for the JetBrains Diff Viewer - GPUI Implementation
 // Clean, modular architecture with separated concerns
 
-// Removed unused import: use eframe::egui;
+// GPUI imports
+use gpui::*;
 
 // Module declarations
 mod actions;
@@ -24,10 +25,10 @@ mod ui;
 mod utils;
 
 // Re-exports for convenience
-use config::WindowConfig;
+use crate::config::WindowConfig;
 
-fn main() -> Result<(), eframe::Error> {
-    println!("🚀 Starting JetBrains Diff Viewer - Modular Edition");
+fn main() {
+    println!("🚀 Starting JetBrains Diff Viewer - GPUI Modular Edition");
 
     // Set up panic handler for better error reporting
     std::panic::set_hook(Box::new(|panic_info| {
@@ -42,15 +43,18 @@ fn main() -> Result<(), eframe::Error> {
         }
     }));
 
-    let options = WindowConfig::get_window_options();
-
     // Initialize the application using the bootstrap
-    let bootstrap = crate::core::app_bootstrap::AppBootstrap::initialize()?;
+    let bootstrap = crate::core::app_bootstrap::AppBootstrap::initialize()
+        .expect("Failed to initialize application");
 
-    // Run the application
-    eframe::run_native(
-        "JetBrains Diff Viewer - Modular",
-        options,
-        bootstrap.create_app_callback(),
-    )
+    // Create the app instance
+    let app = bootstrap.create_app();
+
+    // Run the GPUI application
+    Application::new().run(|cx: &mut App| {
+        let window_options = WindowConfig::get_window_options(cx);
+        cx.open_window(window_options, |_, cx| cx.new(|_| app))
+            .unwrap();
+        cx.activate(true);
+    });
 }

@@ -1,62 +1,56 @@
 // src/syntax/colors.rs
-// JetBrains color scheme for syntax highlighting
+// JetBrains color scheme for syntax highlighting - GPUI Native
 
-use egui::Color32;
 use super::token_types::TokenType;
+use gpui::*;
 
 /// JetBrains color scheme for syntax highlighting
 pub struct JetBrainsColors;
 
 impl JetBrainsColors {
     /// Get color for a specific token type using JetBrains IntelliJ color scheme
-    pub fn get_color_for_token(token_type: &TokenType) -> Color32 {
+    pub fn get_color_for_token(token_type: &TokenType) -> gpui::Hsla {
         match token_type {
-            TokenType::PlainText => Color32::from_rgb(169, 183, 198),     // Light gray
-            TokenType::Keyword => Color32::from_rgb(204, 120, 50),        // Orange
-            TokenType::String => Color32::from_rgb(106, 135, 89),         // Green
-            TokenType::Number => Color32::from_rgb(104, 151, 187),        // Light blue
-            TokenType::FunctionCall => Color32::from_rgb(120, 150, 220),  // Light Blue (like VS Code)
-            TokenType::Comment => Color32::from_rgb(128, 128, 128),       // Gray
-            TokenType::ClassName => Color32::from_rgb(204, 120, 50),      // Orange (like keywords)
-            TokenType::Constant => Color32::from_rgb(154, 110, 58),       // Brown
-            TokenType::Annotation => Color32::from_rgb(169, 183, 198),    // Light gray (like punctuation)
-            TokenType::Operator => Color32::from_rgb(169, 183, 198),      // Light gray
-            TokenType::Punctuation => Color32::from_rgb(169, 183, 198),   // Light gray
-            TokenType::JsxTag => Color32::from_rgb(204, 120, 50),         // Orange
-            TokenType::JsxAttribute => Color32::from_rgb(104, 151, 187),  // Light blue (like numbers)
-            TokenType::Parameter => Color32::from_rgb(152, 118, 170),     // Purple
-            TokenType::Property => Color32::from_rgb(152, 118, 170),      // Purple
+            TokenType::PlainText => hsla(0.0, 0.0, 0.76, 1.0), // Light gray
+            TokenType::Keyword => hsla(30.0 / 360.0, 0.7, 0.6, 1.0), // Orange
+            TokenType::String => hsla(90.0 / 360.0, 0.5, 0.6, 1.0), // Green
+            TokenType::Number => hsla(210.0 / 360.0, 0.6, 0.7, 1.0), // Light blue
+            TokenType::FunctionCall => hsla(210.0 / 360.0, 0.8, 0.75, 1.0), // Light Blue
+            TokenType::Comment => hsla(0.0, 0.0, 0.5, 1.0),    // Gray
+            TokenType::ClassName => hsla(30.0 / 360.0, 0.7, 0.6, 1.0), // Orange (like keywords)
+            TokenType::Constant => hsla(35.0 / 360.0, 0.6, 0.55, 1.0), // Brown
+            TokenType::Annotation => hsla(0.0, 0.0, 0.76, 1.0), // Light gray (like punctuation)
+            TokenType::Operator => hsla(0.0, 0.0, 0.76, 1.0),  // Light gray
+            TokenType::Punctuation => hsla(0.0, 0.0, 0.76, 1.0), // Light gray
+            TokenType::JsxTag => hsla(30.0 / 360.0, 0.7, 0.6, 1.0), // Orange
+            TokenType::JsxAttribute => hsla(210.0 / 360.0, 0.6, 0.7, 1.0), // Light blue
+            TokenType::Parameter => hsla(280.0 / 360.0, 0.6, 0.7, 1.0), // Purple
+            TokenType::Property => hsla(280.0 / 360.0, 0.6, 0.7, 1.0), // Purple
         }
     }
 
-    /// Get all supported token types
-    pub fn supported_token_types() -> Vec<TokenType> {
-        vec![
-            TokenType::PlainText,
-            TokenType::Keyword,
-            TokenType::String,
-            TokenType::Number,
-            TokenType::FunctionCall,
-            TokenType::Comment,
-            TokenType::ClassName,
-            TokenType::Constant,
-            TokenType::Annotation,
-            TokenType::Operator,
-            TokenType::Punctuation,
-            TokenType::JsxTag,
-            TokenType::JsxAttribute,
-            TokenType::Parameter,
-            TokenType::Property,
-        ]
+    /// Get default text color
+    pub fn default_text_color() -> gpui::Hsla {
+        hsla(0.0, 0.0, 0.87, 1.0) // Light gray for dark theme
     }
 
-    /// Check if a token type should be bold
-    pub fn is_bold(token_type: &TokenType) -> bool {
-        matches!(token_type, TokenType::Keyword | TokenType::ClassName)
+    /// Get comment color
+    pub fn comment_color() -> gpui::Hsla {
+        hsla(0.0, 0.0, 0.5, 1.0) // Medium gray
     }
 
-    /// Check if a token type should be italic
-    pub fn is_italic(token_type: &TokenType) -> bool {
-        matches!(token_type, TokenType::Comment | TokenType::Annotation)
+    /// Get keyword color
+    pub fn keyword_color() -> gpui::Hsla {
+        hsla(30.0 / 360.0, 0.7, 0.6, 1.0) // Orange
+    }
+
+    /// Get string color  
+    pub fn string_color() -> gpui::Hsla {
+        hsla(90.0 / 360.0, 0.5, 0.6, 1.0) // Green
+    }
+
+    /// Get number color
+    pub fn number_color() -> gpui::Hsla {
+        hsla(210.0 / 360.0, 0.6, 0.7, 1.0) // Light blue
     }
 }

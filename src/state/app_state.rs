@@ -1,6 +1,7 @@
 // src/state/app_state.rs
 // Application state structure extracted from state/mod.rs
 
+use crate::models::ui::{ConnectorCurve, ConnectorOperation};
 use crate::models::*;
 use crate::navigation::NavigationState;
 

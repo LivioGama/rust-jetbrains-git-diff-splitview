@@ -1,229 +1,151 @@
-// JetBrains theme implementation with Zed IDE font specifications
-use crate::config::{FontMetrics, LineHeightMode, ZedFontConfig, ZedFontManager, ZedSettings};
-use egui::{Color32, Stroke};
+// JetBrains theme implementation for diff viewer - GPUI Implementation
 
 #[derive(Debug, Clone)]
 pub struct JetBrainsTheme {
-    pub color_blue_500: Color32,
-    pub font_config: ZedFontConfig,
-    pub editor_settings: ZedSettings,
-    pub gutter_width: f32,
-    pub connector_width: f32,
-    pub addition_background: Color32,
-    pub addition_foreground: Color32,
-    pub addition_gutter: Color32,
-    pub deletion_background: Color32,
-    pub deletion_foreground: Color32,
-    pub deletion_gutter: Color32,
-    pub modification_background: Color32,
-    pub modification_foreground: Color32,
-    pub modification_gutter: Color32,
-    pub code_foreground: Color32,
-    pub code_comment: Color32,
-    pub code_keyword: Color32,
-    pub code_string: Color32,
-    pub background: Color32,
-    pub foreground: Color32,
-    pub border: Color32,
-    pub gutter_background: Color32,
-    pub gutter_border: Color32,
-    pub connector_column: Color32,
-    pub line_numbers: Color32,
-    pub show_line_numbers: bool,
+    // Background colors
+    pub background: gpui::Hsla,
+    pub connector_column: gpui::Hsla,
+
+    // Text colors
+    pub foreground: gpui::Hsla,
+    pub code_foreground: gpui::Hsla,
+    pub code_comment: gpui::Hsla,
+    pub code_keyword: gpui::Hsla,
+    pub code_string: gpui::Hsla,
+    pub line_numbers: gpui::Hsla,
+
+    // Diff colors
+    pub addition_background: gpui::Hsla,
+    pub addition_foreground: gpui::Hsla,
+    pub deletion_background: gpui::Hsla,
+    pub deletion_foreground: gpui::Hsla,
+    pub modification_background: gpui::Hsla,
+    pub modification_foreground: gpui::Hsla,
+
+    // UI colors
+    pub selection: gpui::Hsla,
+    pub cursor: gpui::Hsla,
+
+    // Font settings (GPUI native)
+    buffer_font_size: f32,
+    ui_font_size: f32,
+    line_height_multiplier: f32,
 }
 
 impl JetBrainsTheme {
+    /// Create a dark theme matching JetBrains IDEs
     pub fn dark_theme() -> Self {
-        let font_config =
-            ZedFontConfig::default().with_line_height_mode(LineHeightMode::Comfortable);
-        let editor_settings = ZedSettings::default();
-
         Self {
-            color_blue_500: Color32::from_rgb(33, 150, 243),
-            font_config,
-            editor_settings,
-            gutter_width: 45.0,
-            connector_width: 45.0,
-            addition_background: Color32::from_rgb(52, 85, 52),
-            addition_foreground: Color32::from_rgb(129, 199, 132),
-            addition_gutter: Color32::from_rgb(52, 85, 52),
-            deletion_background: Color32::from_rgb(85, 56, 56), // Rouge foncé solide (pas de transparence)
-            deletion_foreground: Color32::from_rgb(239, 154, 154),
-            deletion_gutter: Color32::from_rgb(113, 113, 113),
-            modification_background: Color32::from_rgb(50, 66, 98),
-            modification_foreground: Color32::from_rgb(212, 212, 212), // Use normal foreground for modifications
-            modification_gutter: Color32::from_rgb(50, 66, 98),
-            code_foreground: Color32::from_rgb(212, 212, 212),
-            code_comment: Color32::from_rgb(106, 153, 85),
-            code_keyword: Color32::from_rgb(86, 156, 214),
-            code_string: Color32::from_rgb(206, 145, 120),
-            background: Color32::from_rgb(30, 30, 30),
-            foreground: Color32::from_rgb(212, 212, 212),
-            border: Color32::from_rgb(62, 62, 62),
-            gutter_background: Color32::from_rgb(37, 37, 38),
-            gutter_border: Color32::from_rgb(62, 62, 62),
-            connector_column: Color32::from_rgb(45, 45, 45),
-            line_numbers: Color32::from_rgb(153, 153, 153),
-            show_line_numbers: true,
-        }
-    }
+            // Dark background theme
+            background: gpui::hsla(0.0, 0.0, 0.12, 1.0), // Dark gray background
+            connector_column: gpui::hsla(0.0, 0.0, 0.15, 1.0), // Darker background for connector column
 
-    pub fn apply_to_context(&self, ctx: &egui::Context) {
-        // Apply Zed font configuration first
-        let font_manager = ZedFontManager::with_config(self.font_config.clone());
-        font_manager.apply_to_context(ctx);
+            // Text colors
+            foreground: gpui::hsla(0.0, 0.0, 0.87, 1.0), // Light gray text
+            code_foreground: gpui::hsla(0.0, 0.0, 0.87, 1.0), // Light gray for code
+            code_comment: gpui::hsla(0.0, 0.0, 0.5, 1.0), // Medium gray for comments
+            code_keyword: gpui::hsla(30.0 / 360.0, 0.7, 0.6, 1.0), // Orange for keywords
+            code_string: gpui::hsla(90.0 / 360.0, 0.5, 0.6, 1.0), // Green for strings
+            line_numbers: gpui::hsla(0.0, 0.0, 0.4, 1.0), // Darker gray for line numbers
 
-        let mut style = (*ctx.style()).clone();
-        style.visuals.dark_mode = self.background.r() < 128;
-        style.visuals.window_fill = self.background;
-        style.visuals.panel_fill = self.background;
-        style.visuals.faint_bg_color = self.background;
-        style.visuals.override_text_color = Some(self.foreground);
-        style.visuals.selection.bg_fill = self.modification_background;
-        style.visuals.selection.stroke = Stroke::new(1.0, self.modification_background);
-        ctx.set_style(style);
-    }
+            // Diff highlighting colors
+            addition_background: gpui::hsla(120.0 / 360.0, 0.6, 0.25, 0.3), // Green with transparency
+            addition_foreground: gpui::hsla(120.0 / 360.0, 0.8, 0.7, 1.0),  // Bright green
+            deletion_background: gpui::hsla(0.0 / 360.0, 0.6, 0.25, 0.3),   // Red with transparency
+            deletion_foreground: gpui::hsla(0.0 / 360.0, 0.8, 0.7, 1.0),    // Bright red
+            modification_background: gpui::hsla(210.0 / 360.0, 0.6, 0.25, 0.3), // Blue with transparency
+            modification_foreground: gpui::hsla(210.0 / 360.0, 0.8, 0.7, 1.0),  // Bright blue
 
-    /// Get Zed-style buffer font size
-    pub fn buffer_font_size(&self) -> f32 {
-        self.font_config.buffer_font_size
-    }
+            // UI colors
+            selection: gpui::hsla(210.0 / 360.0, 0.8, 0.4, 0.4), // Blue selection
+            cursor: gpui::hsla(0.0, 0.0, 1.0, 1.0),              // White cursor
 
-    /// Get Zed-style UI font size
-    pub fn ui_font_size(&self) -> f32 {
-        self.font_config.ui_font_size
-    }
-
-    /// Get calculated line height using Zed's golden ratio
-    pub fn line_height(&self) -> f32 {
-        self.font_config.calculated_buffer_line_height()
-    }
-
-    /// Get buffer font ID for egui
-    pub fn buffer_font_id(&self) -> egui::FontId {
-        self.font_config.buffer_font_id()
-    }
-
-    /// Get UI font ID for egui
-    pub fn ui_font_id(&self) -> egui::FontId {
-        self.font_config.ui_font_id()
-    }
-
-    /// Check if ligatures are enabled
-    pub fn ligatures_enabled(&self) -> bool {
-        self.font_config.ligatures_enabled
-    }
-
-    /// Calculate baseline offset for text rendering
-    pub fn baseline_offset(&self) -> f32 {
-        FontMetrics::calculate_baseline_offset(self.line_height(), self.buffer_font_size())
-    }
-
-    /// Get character width approximation for monospace text
-    pub fn char_width(&self) -> f32 {
-        FontMetrics::approximate_char_width(self.buffer_font_size())
-    }
-
-    /// Get Zed editor settings
-    pub fn editor_settings(&self) -> &ZedSettings {
-        &self.editor_settings
-    }
-
-    /// Check if cursor should blink based on Zed settings
-    pub fn cursor_should_blink(&self) -> bool {
-        self.editor_settings.editor().cursor_blink
-    }
-
-    /// Get vertical scroll margin from Zed settings
-    pub fn vertical_scroll_margin(&self) -> u32 {
-        self.editor_settings.editor().vertical_scroll_margin
-    }
-
-    /// Get horizontal scroll margin from Zed settings
-    pub fn horizontal_scroll_margin(&self) -> u32 {
-        self.editor_settings.editor().horizontal_scroll_margin
-    }
-
-    /// Get scroll sensitivity from Zed settings
-    pub fn scroll_sensitivity(&self) -> f32 {
-        self.editor_settings.editor().scroll_sensitivity
-    }
-
-    /// Get tab size from Zed language settings
-    pub fn tab_size(&self) -> u32 {
-        self.editor_settings.language.tab_size
-    }
-
-    /// Check if hard tabs should be used
-    pub fn use_hard_tabs(&self) -> bool {
-        self.editor_settings.language.hard_tabs
-    }
-
-    pub fn get_connector_color(&self, line_type: &crate::models::line::LineType) -> Color32 {
-        match line_type {
-            crate::models::line::LineType::Addition => self.addition_background,
-            crate::models::line::LineType::Deletion => self.deletion_background,
-            crate::models::line::LineType::Modification => self.modification_background,
-            _ => self.modification_background,
-        }
-    }
-
-    pub fn get_line_background(&self, line_type: &crate::models::line::LineType) -> Color32 {
-        match line_type {
-            crate::models::line::LineType::Addition => self.addition_background,
-            crate::models::line::LineType::Deletion => self.deletion_background,
-            crate::models::line::LineType::Modification => self.modification_background,
-            crate::models::line::LineType::Context => Color32::TRANSPARENT,
-        }
-    }
-
-    /// Create a safe default theme that won't panic
-    pub fn safe_default() -> Self {
-        // Use minimal, safe configuration with system fonts
-        let font_config = ZedFontConfig {
-            buffer_font_family: "monospace".to_string(),
+            // Font configuration
             buffer_font_size: 14.0,
-            buffer_font_weight: 400,
-            buffer_line_height: 14.0 * 1.3, // Standard line height
-            ui_font_family: "sans-serif".to_string(),
-            ui_font_size: 14.0,
-            ui_font_weight: 400,
-            terminal_font_family: "monospace".to_string(),
-            terminal_font_size: 14.0,
-            terminal_line_height: 14.0 * 1.3,
-            ligatures_enabled: false,
-            line_height_mode: LineHeightMode::Comfortable,
-        };
+            ui_font_size: 12.0,
+            line_height_multiplier: 1.6,
+        }
+    }
 
-        let editor_settings = ZedSettings::default();
+    /// Get line background color for diff highlighting
+    pub fn get_line_background(&self, line_type: &crate::models::line::LineType) -> gpui::Hsla {
+        use crate::models::line::LineType;
+        match line_type {
+            LineType::Addition => self.addition_background,
+            LineType::Deletion => self.deletion_background,
+            LineType::Modification => self.modification_background,
+            LineType::Context => gpui::hsla(0.0, 0.0, 0.0, 0.0), // Transparent for context lines
+        }
+    }
 
+    /// Get the buffer font size
+    pub fn buffer_font_size(&self) -> f32 {
+        self.buffer_font_size
+    }
+
+    /// Get the UI font size
+    pub fn ui_font_size(&self) -> f32 {
+        self.ui_font_size
+    }
+
+    /// Calculate line height based on font size and multiplier
+    pub fn line_height(&self) -> f32 {
+        self.buffer_font_size * self.line_height_multiplier
+    }
+
+    /// Calculate baseline offset for text alignment
+    pub fn baseline_offset(&self) -> f32 {
+        self.line_height() * 0.8
+    }
+
+    /// Get character width (monospace assumption)
+    pub fn char_width(&self) -> f32 {
+        self.buffer_font_size * 0.6 // Approximate monospace character width
+    }
+
+    /// Get gutter width for line numbers
+    pub fn gutter_width(&self) -> f32 {
+        50.0 // Fixed gutter width in pixels
+    }
+
+    /// Update font sizes
+    pub fn with_font_sizes(mut self, buffer_font_size: f32, ui_font_size: f32) -> Self {
+        self.buffer_font_size = buffer_font_size;
+        self.ui_font_size = ui_font_size;
+        self
+    }
+
+    /// Create a light theme variant
+    pub fn light_theme() -> Self {
         Self {
-            color_blue_500: Color32::from_rgb(100, 150, 200),
-            font_config,
-            editor_settings,
-            gutter_width: 40.0,
-            connector_width: 40.0,
-            addition_background: Color32::from_rgb(40, 60, 40),
-            addition_foreground: Color32::from_rgb(100, 180, 100),
-            addition_gutter: Color32::from_rgb(40, 60, 40),
-            deletion_background: Color32::from_rgb(80, 50, 50), // Rouge plus visible
-            deletion_foreground: Color32::from_rgb(200, 120, 120),
-            deletion_gutter: Color32::from_rgb(80, 80, 80),
-            modification_background: Color32::from_rgb(40, 50, 80),
-            modification_foreground: Color32::from_rgb(200, 200, 200), // Use normal foreground for modifications
-            modification_gutter: Color32::from_rgb(40, 50, 80),
-            code_foreground: Color32::from_rgb(200, 200, 200),
-            code_comment: Color32::from_rgb(100, 140, 80),
-            code_keyword: Color32::from_rgb(80, 140, 200),
-            code_string: Color32::from_rgb(200, 140, 100),
-            background: Color32::from_rgb(40, 40, 40),
-            foreground: Color32::from_rgb(200, 200, 200),
-            border: Color32::from_rgb(80, 80, 80),
-            gutter_background: Color32::from_rgb(50, 50, 50),
-            gutter_border: Color32::from_rgb(80, 80, 80),
-            connector_column: Color32::from_rgb(60, 60, 60),
-            line_numbers: Color32::from_rgb(140, 140, 140),
-            show_line_numbers: true,
+            // Light background theme
+            background: gpui::hsla(0.0, 0.0, 0.98, 1.0), // Very light gray background
+            connector_column: gpui::hsla(0.0, 0.0, 0.92, 1.0), // Slightly darker for connector column
+
+            // Text colors (inverted from dark theme)
+            foreground: gpui::hsla(0.0, 0.0, 0.13, 1.0), // Dark gray text
+            code_foreground: gpui::hsla(0.0, 0.0, 0.13, 1.0), // Dark gray for code
+            code_comment: gpui::hsla(0.0, 0.0, 0.5, 1.0), // Medium gray for comments
+            code_keyword: gpui::hsla(30.0 / 360.0, 0.7, 0.4, 1.0), // Darker orange for keywords
+            code_string: gpui::hsla(90.0 / 360.0, 0.5, 0.4, 1.0), // Darker green for strings
+            line_numbers: gpui::hsla(0.0, 0.0, 0.6, 1.0), // Medium gray for line numbers
+
+            // Diff highlighting colors (lighter variants)
+            addition_background: gpui::hsla(120.0 / 360.0, 0.6, 0.85, 0.5), // Light green with transparency
+            addition_foreground: gpui::hsla(120.0 / 360.0, 0.8, 0.3, 1.0),  // Dark green
+            deletion_background: gpui::hsla(0.0 / 360.0, 0.6, 0.85, 0.5), // Light red with transparency
+            deletion_foreground: gpui::hsla(0.0 / 360.0, 0.8, 0.3, 1.0),  // Dark red
+            modification_background: gpui::hsla(210.0 / 360.0, 0.6, 0.85, 0.5), // Light blue with transparency
+            modification_foreground: gpui::hsla(210.0 / 360.0, 0.8, 0.3, 1.0),  // Dark blue
+
+            // UI colors
+            selection: gpui::hsla(210.0 / 360.0, 0.8, 0.6, 0.4), // Blue selection
+            cursor: gpui::hsla(0.0, 0.0, 0.0, 1.0),              // Black cursor
+
+            // Font configuration
+            buffer_font_size: 14.0,
+            ui_font_size: 12.0,
+            line_height_multiplier: 1.6,
         }
     }
 }

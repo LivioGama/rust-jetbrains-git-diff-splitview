@@ -1,7 +1,4 @@
-#[allow(dead_code)]
-// diffsplit/src/navigation/mod.rs
-// Keyboard navigation module for diff viewer
-use eframe::egui;
+use gpui::*;
 
 /// Navigation actions that can be performed
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -25,90 +22,56 @@ pub struct NavigationState {
     pub total_connectors: usize,
 }
 
-/// Navigation handler for keyboard input
+/// Navigation handler for managing navigation state
 pub struct NavigationHandler {
     state: NavigationState,
+    current_block_index: usize,
 }
 
 impl NavigationHandler {
     pub fn new() -> Self {
         Self {
             state: NavigationState::default(),
+            current_block_index: 0,
         }
     }
 
-    /// Handle keyboard input and return the appropriate navigation action
-    pub fn handle_input(&mut self, ctx: &egui::Context) -> NavigationAction {
-        if ctx.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
-            self.navigate_to_next_diff_block();
-            NavigationAction::NextDiffBlock
-        } else if ctx.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
-            self.navigate_to_previous_diff_block();
-            NavigationAction::PreviousDiffBlock
-        } else if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
-            self.navigate_to_next_connector();
-            NavigationAction::NextConnector
-        } else if ctx.input(|i| i.key_pressed(egui::Key::ArrowLeft)) {
-            self.navigate_to_previous_connector();
-            NavigationAction::PreviousConnector
-        } else if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
-            NavigationAction::ApplyHunk
-        } else if ctx.input(|i| i.key_pressed(egui::Key::Backspace)) {
-            NavigationAction::RevertHunk
-        } else if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
-            NavigationAction::StageHunk
-        } else {
-            NavigationAction::None
-        }
+    pub fn get_state(&self) -> &NavigationState {
+        &self.state
     }
 
-    /// Update the navigation state with current data
+    pub fn get_state_mut(&mut self) -> &mut NavigationState {
+        &mut self.state
+    }
+
     pub fn update_state(&mut self, total_blocks: usize, total_connectors: usize) {
         self.state.total_blocks = total_blocks;
         self.state.total_connectors = total_connectors;
-
-        // Ensure current indices are within bounds
-        if self.state.current_block_index >= total_blocks && total_blocks > 0 {
-            self.state.current_block_index = total_blocks - 1;
-        }
-
-        if self.state.current_connector_index >= total_connectors && total_connectors > 0 {
-            self.state.current_connector_index = total_connectors - 1;
-        }
     }
 
-    fn navigate_to_next_diff_block(&mut self) {
+    pub fn current_block_index(&self) -> usize {
+        self.current_block_index
+    }
+
+    pub fn navigate_to_next_diff_block(&mut self) {
         if self.state.total_blocks > 0 {
-            self.state.current_block_index =
-                (self.state.current_block_index + 1) % self.state.total_blocks;
+            self.current_block_index = (self.current_block_index + 1) % self.state.total_blocks;
         }
     }
 
-    fn navigate_to_previous_diff_block(&mut self) {
+    pub fn navigate_to_previous_diff_block(&mut self) {
         if self.state.total_blocks > 0 {
-            self.state.current_block_index = if self.state.current_block_index == 0 {
-                self.state.total_blocks - 1
+            if self.current_block_index == 0 {
+                self.current_block_index = self.state.total_blocks - 1;
             } else {
-                self.state.current_block_index - 1
-            };
+                self.current_block_index -= 1;
+            }
         }
     }
 
-    fn navigate_to_next_connector(&mut self) {
-        if self.state.total_connectors > 0 {
-            self.state.current_connector_index =
-                (self.state.current_connector_index + 1) % self.state.total_connectors;
-        }
-    }
-
-    fn navigate_to_previous_connector(&mut self) {
-        if self.state.total_connectors > 0 {
-            self.state.current_connector_index = if self.state.current_connector_index == 0 {
-                self.state.total_connectors - 1
-            } else {
-                self.state.current_connector_index - 1
-            };
-        }
+    pub fn handle_input(&self, _cx: &gpui::App) -> NavigationAction {
+        // Simplified input handling - just return None for now
+        NavigationAction::None
     }
 }
 

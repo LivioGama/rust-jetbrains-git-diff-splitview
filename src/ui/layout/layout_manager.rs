@@ -1,29 +1,24 @@
-// src/ui/layout/layout_manager.rs
-// Main layout manager extracted from layout/mod.rs
-
-use super::{gutter::GutterRenderer, panes::PaneRenderer};
+// Layout manager for diff viewer - GPUI Implementation with mesh-based connector rendering
 use crate::config::LayoutConfig;
+use crate::diff::imara::{ImaraBlockOperation, ImaraDiffAnalysis};
 use crate::models::diff::MappingSegment;
 use crate::models::line::DisplayLine;
-use crate::ui::ConnectorRenderer;
-use eframe::egui;
-use egui::{Pos2, Rect, Vec2};
+use crate::sync::ScrollSync;
+use crate::theme::JetBrainsTheme;
+use gpui::*;
+
+use super::connectors::{ConnectorState, ConnectorUtils};
 
 /// Layout manager for the diff viewer
 pub struct LayoutManager {
     config: LayoutConfig,
-    connector_renderer: ConnectorRenderer,
-    pane_renderer: PaneRenderer,
-    gutter_renderer: GutterRenderer,
+    pane_renderer: super::panes::PaneRenderer,
 }
 
 impl LayoutManager {
     pub fn new(config: LayoutConfig) -> Self {
-        let theme = crate::theme::JetBrainsTheme::dark_theme();
         Self {
-            connector_renderer: ConnectorRenderer::new(theme),
-            pane_renderer: PaneRenderer::new(config.clone()),
-            gutter_renderer: GutterRenderer::new(config.clone()),
+            pane_renderer: super::panes::PaneRenderer::new(config.clone()),
             config,
         }
     }
@@ -32,431 +27,462 @@ impl LayoutManager {
         Self::new(LayoutConfig::default())
     }
 
-    /// Render the complete application layout
+    /// Render the main layout using GPUI with two panes and connectors
     pub fn render_layout(
         &self,
-        ui: &mut egui::Ui,
         old_lines: &[DisplayLine],
         new_lines: &[DisplayLine],
         scroll_sync: &mut crate::sync::ScrollSync,
         theme: &crate::theme::JetBrainsTheme,
         line_renderer: &mut crate::ui::LineRenderer,
-        _connector_renderer: &mut crate::ui::ConnectorRenderer,
         mapping_segments: &[MappingSegment],
         imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
-    ) {
-        let total_height = ui.available_height();
-        let total_width = ui.available_width();
-        let pane_width = (total_width - self.config.connector_column_width) / 2.0;
+        viewport_height: f32,
+        left_scroll: f32,
+        right_scroll: f32,
+    ) -> impl IntoElement {
+        let connector_width = px(self.config.connector_column_width);
 
-        // Create a horizontal layout with explicit height allocation and no spacing
-        ui.allocate_ui_with_layout(
-            Vec2::new(total_width, total_height),
-            egui::Layout::left_to_right(egui::Align::TOP),
-            |ui| {
-                ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
-
-                // Left pane (original)
-                self.pane_renderer.render_left_pane(
-                    ui,
-                    old_lines,
-                    scroll_sync,
-                    theme,
-                    line_renderer,
-                    pane_width,
-                    total_height,
-                    mapping_segments,
-                    imara_analysis,
-                );
-
-                // Middle gutter background (connectors will be drawn later)
-                let gutter_rect = ui
-                    .allocate_response(
-                        egui::Vec2::new(self.config.connector_column_width, total_height),
-                        egui::Sense::hover(),
-                    )
-                    .rect;
-                ui.painter()
-                    .rect_filled(gutter_rect, 0.0, theme.connector_column);
-
-                // Right pane (modified)
-                self.pane_renderer.render_right_pane(
-                    ui,
-                    new_lines,
-                    scroll_sync,
-                    theme,
-                    line_renderer,
-                    pane_width,
-                    total_height,
-                    mapping_segments,
-                    imara_analysis,
-                );
-            },
+        // Create connector state for rectangle storage and management
+        let mut connector_state = ConnectorState::new();
+        connector_state.update_viewport(viewport_height, left_scroll, right_scroll);
+        eprintln!(
+            "[DEBUG] render_layout viewport_height={:.1}, left_scroll={:.1}, right_scroll={:.1}",
+            viewport_height, left_scroll, right_scroll
         );
 
-        // Now render connectors after both panes are rendered - use original working method
-        self.render_connectors(
-            ui,
-            &old_lines,
-            &new_lines,
-            pane_width,
+        // Render left pane and store its rectangles
+        let left_pane = self.pane_renderer.render_pane_gpui(
+            "Original",
+            old_lines,
             scroll_sync,
+            theme,
+            line_renderer,
+            px(0.0),
+            mapping_segments,
             imara_analysis,
+            true,
+            left_scroll,
+            right_scroll,
+            &mut connector_state,
         );
+
+        // Render right pane and store its rectangles
+        let right_pane = self.pane_renderer.render_pane_gpui(
+            "Modified",
+            new_lines,
+            scroll_sync,
+            theme,
+            line_renderer,
+            px(0.0),
+            mapping_segments,
+            imara_analysis,
+            false,
+            left_scroll,
+            right_scroll,
+            &mut connector_state,
+        );
+
+        // Create connector renderer with stored rectangle data
+        let connector_gutter = self.create_connector_gutter(
+            &connector_state,
+            scroll_sync,
+            theme,
+            imara_analysis,
+            connector_width,
+            viewport_height,
+        );
+
+        div()
+            .h_full()
+            .w_full()
+            .flex()
+            .flex_row()
+            .relative()
+            .children(vec![
+                // Left pane (original) - 50% width
+                div()
+                    .flex_1()
+                    .h_full()
+                    .min_w_0()
+                    .min_h_0()
+                    .child(left_pane)
+                    .into_any_element(),
+                // Middle gutter with connectors - fixed width
+                connector_gutter,
+                // Right pane (modified) - 50% width
+                div()
+                    .flex_1()
+                    .h_full()
+                    .min_w_0()
+                    .min_h_0()
+                    .child(right_pane)
+                    .into_any_element(),
+            ])
     }
 
-    /// Render connectors between panes (restored from original working version)
-    fn render_connectors(
+    /// Create connector gutter with proper state-based rendering
+    fn create_connector_gutter(
         &self,
-        ui: &mut egui::Ui,
-        _old_lines: &[DisplayLine],
-        _new_lines: &[DisplayLine],
-        pane_width: f32,
-        _scroll_sync: &crate::sync::ScrollSync,
-        imara_analysis: &crate::diff::imara::ImaraDiffAnalysis,
-    ) {
-        // Get stored rectangle positions
-        let left_rects: Option<Vec<egui::Rect>> = ui
-            .ctx()
-            .memory_mut(|mem| mem.data.get_persisted("left_rects".into()));
-        let right_rects: Option<Vec<egui::Rect>> = ui
-            .ctx()
-            .memory_mut(|mem| mem.data.get_persisted("right_rects".into()));
+        connector_state: &ConnectorState,
+        _scroll_sync: &ScrollSync,
+        theme: &JetBrainsTheme,
+        imara_analysis: &ImaraDiffAnalysis,
+        connector_width: Pixels,
+        viewport_height: f32,
+    ) -> gpui::AnyElement {
+        // Only render connectors if we have valid rectangle data
+        if !connector_state.has_valid_rects() {
+            return div()
+                .flex_none()
+                .w(connector_width)
+                .h_full()
+                .min_h(px(400.0))
+                .relative()
+                .overflow_hidden()
+                .bg(theme.connector_column)
+                .into_any_element();
+        }
 
-        if let (Some(left_rects), Some(right_rects)) = (left_rects, right_rects) {
-            // Calculate gutter position
-            let gutter_x_start = pane_width;
-            let _gutter_x_end = gutter_x_start + self.config.connector_column_width;
+        // Create connector elements using stored rectangle data
+        let connector_elements =
+            self.generate_connector_elements(connector_state, theme, imara_analysis);
 
-            // Use imara-diff semantic blocks for connector mapping
-            let mut connectors = Vec::new();
+        let header_spacer_height = 31.0;
 
-            for imara_block in &imara_analysis.blocks {
-                if !imara_block.is_change() {
-                    continue;
-                }
+        div()
+            .flex_none()
+            .w(connector_width)
+            .h_full()
+            .min_h(px(400.0))
+            .flex()
+            .flex_col()
+            .relative()
+            .overflow_hidden()
+            .bg(theme.connector_column)
+            .children(vec![
+                div()
+                    .flex_none()
+                    .w_full()
+                    .h(px(header_spacer_height))
+                    .bg(theme.connector_column)
+                    .into_any_element(),
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .relative()
+                    .overflow_hidden()
+                    .children(connector_elements)
+                    .into_any_element(),
+            ])
+            .into_any_element()
+    }
 
-                // Use the semantic ranges from imara-diff for connector mapping
-                let left_start = imara_block.left_range.start;
-                let left_end = imara_block.left_range.end.saturating_sub(1);
-                let right_start = imara_block.right_range.start;
-                let right_end = imara_block.right_range.end.saturating_sub(1);
+    /// Generate connector elements from stored rectangle data
+    fn generate_connector_elements(
+        &self,
+        connector_state: &ConnectorState,
+        theme: &JetBrainsTheme,
+        imara_analysis: &ImaraDiffAnalysis,
+    ) -> Vec<gpui::AnyElement> {
+        eprintln!(
+            "[DEBUG] generate_connector_elements called with {} blocks",
+            imara_analysis.blocks.len()
+        );
+        eprintln!(
+            "[DEBUG] connector_state has valid rects: {}",
+            connector_state.has_valid_rects()
+        );
+        eprintln!(
+            "[DEBUG] left rects: {}, right rects: {}",
+            connector_state.left_rects.len(),
+            connector_state.right_rects.len()
+        );
 
-                // Only create connectors for blocks that have both left and right ranges
-                if !imara_block.left_range.is_empty() && !imara_block.right_range.is_empty() {
-                    connectors.push((
-                        left_start,
-                        left_end,
-                        right_start,
-                        right_end,
-                        &imara_block.operation,
-                    ));
-                }
+        let mut elements = Vec::new();
+        let connector_width = self.config.connector_column_width as f32;
+        let left_x_end = 0.0;
+        let right_x_start = connector_width;
+
+        eprintln!(
+            "[DEBUG] connector_width: {}, left_x_end: {}, right_x_start: {}",
+            connector_width, left_x_end, right_x_start
+        );
+
+        // Process each imara diff block
+        for (block_idx, block) in imara_analysis.blocks.iter().enumerate() {
+            eprintln!(
+                "[DEBUG] Processing block {}: left_range={:?}, right_range={:?}",
+                block_idx, block.left_range, block.right_range
+            );
+
+            if block.left_range.is_empty() && block.right_range.is_empty() {
+                eprintln!("[DEBUG] Block {} skipped - both ranges empty", block_idx);
+                continue;
             }
 
-            // Get stored crushed line positions
-            let left_crushed_rects: Option<Vec<(usize, egui::Rect, String)>> =
-                ui.ctx().memory_mut(|mem| {
-                    mem.data
-                        .get_persisted("left_crushed_rects".to_string().into())
-                });
-            let right_crushed_rects: Option<Vec<(usize, egui::Rect, String)>> =
-                ui.ctx().memory_mut(|mem| {
-                    mem.data
-                        .get_persisted("right_crushed_rects".to_string().into())
-                });
+            let color = match &block.operation {
+                ImaraBlockOperation::Insert => theme.addition_background.opacity(0.9),
+                ImaraBlockOperation::Delete => theme.deletion_background.opacity(0.9),
+                ImaraBlockOperation::Modify => theme.modification_background.opacity(0.9),
+            };
 
-            // Handle pure insertion blocks - connect to actual crushed lines in left pane
-            if let Some(left_crushed) = &left_crushed_rects {
-                for imara_block in &imara_analysis.blocks {
-                    if imara_block.is_pure_insertion() && !imara_block.right_range.is_empty() {
-                        let right_start = imara_block.right_range.start;
-                        let right_end = imara_block.right_range.end.saturating_sub(1);
+            eprintln!("[DEBUG] Block {} color: {:?}", block_idx, color);
 
-                        // Find corresponding crushed line
-                        if let Some((_, crushed_rect, _)) =
-                            left_crushed.iter().find(|(idx, _, _)| *idx == right_start)
-                        {
-                            if let (Some(right_start_rect), Some(right_end_rect)) =
-                                (right_rects.get(right_start), right_rects.get(right_end))
-                            {
-                                // Connect from the actual crushed line position to the right block
-                                let left_x_end = gutter_x_start;
-                                let crushed_line_y = crushed_rect.min.y;
-                                let right_x_start = right_start_rect.min.x;
-                                let right_top_y = right_start_rect.top();
-                                let right_bottom_y = right_end_rect.bottom();
-
-                                // Use green color for additions with transparency
-                                let addition_color =
-                                    egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64);
-
-                                // Draw connector from the crushed line to the actual right block
-                                self.draw_connector(
-                                    ui,
-                                    left_x_end,
-                                    crushed_line_y,
-                                    crushed_line_y + 2.0,
-                                    right_x_start,
-                                    right_top_y,
-                                    right_bottom_y,
-                                    addition_color,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Handle pure deletion blocks - connect to actual crushed lines in right pane
-            if let Some(right_crushed) = &right_crushed_rects {
-                for imara_block in &imara_analysis.blocks {
-                    if imara_block.is_pure_deletion() && !imara_block.left_range.is_empty() {
-                        let left_start = imara_block.left_range.start;
-                        let left_end = imara_block.left_range.end.saturating_sub(1);
-
-                        // Find corresponding crushed line
-                        if let Some((_, crushed_rect, _)) =
-                            right_crushed.iter().find(|(idx, _, _)| *idx == left_start)
-                        {
-                            if let (Some(left_start_rect), Some(left_end_rect)) =
-                                (left_rects.get(left_start), left_rects.get(left_end))
-                            {
-                                // Connect from the left block to the actual crushed line position
-                                let left_x_end = left_start_rect.max.x;
-                                let left_top_y = left_start_rect.top();
-                                let left_bottom_y = left_end_rect.bottom();
-
-                                let right_x_start =
-                                    gutter_x_start + self.config.connector_column_width;
-                                let crushed_line_y = crushed_rect.min.y;
-
-                                // Use red color for deletions with transparency
-                                let deletion_color =
-                                    egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64);
-
-                                // Draw connector from the left block to the crushed line
-                                self.draw_connector(
-                                    ui,
-                                    left_x_end,
-                                    left_top_y,
-                                    left_bottom_y,
-                                    right_x_start,
-                                    crushed_line_y,
-                                    crushed_line_y + 2.0,
-                                    deletion_color,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Handle pure deletion blocks - connect to actual crushed lines in right pane
-            if let Some(right_crushed) = &right_crushed_rects {
-                for imara_block in &imara_analysis.blocks {
-                    if imara_block.is_pure_deletion() && !imara_block.left_range.is_empty() {
-                        let left_start = imara_block.left_range.start;
-                        let left_end = imara_block.left_range.end.saturating_sub(1);
-
-                        // Find corresponding crushed line
-                        if let Some((_, crushed_rect, _)) =
-                            right_crushed.iter().find(|(idx, _, _)| *idx == left_start)
-                        {
-                            if let (Some(left_start_rect), Some(left_end_rect)) =
-                                (left_rects.get(left_start), left_rects.get(left_end))
-                            {
-                                // Connect from the left block to the actual crushed line position
-                                let left_x_end = left_start_rect.max.x;
-                                let left_top_y = left_start_rect.top();
-                                let left_bottom_y = left_end_rect.bottom();
-
-                                let right_x_start =
-                                    gutter_x_start + self.config.connector_column_width;
-                                let crushed_line_y = crushed_rect.min.y;
-
-                                // Use red color for deletions with transparency
-                                let deletion_color =
-                                    egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64);
-
-                                // Draw connector from the left block to the crushed line
-                                self.draw_connector(
-                                    ui,
-                                    left_x_end,
-                                    left_top_y,
-                                    left_bottom_y,
-                                    right_x_start,
-                                    crushed_line_y,
-                                    crushed_line_y + 2.0,
-                                    deletion_color,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Draw connectors for each hunk pair
-            for (left_start, left_end, right_start, right_end, operation) in connectors {
-                if let (
-                    Some(left_start_rect),
-                    Some(left_end_rect),
-                    Some(right_start_rect),
-                    Some(right_end_rect),
-                ) = (
-                    left_rects.get(left_start),
-                    left_rects.get(left_end),
-                    right_rects.get(right_start),
-                    right_rects.get(right_end),
+            // Handle different types of connectors
+            if block.is_pure_insertion() {
+                eprintln!("[DEBUG] Block {} is pure insertion", block_idx);
+            } else {
+                eprintln!(
+                    "[DEBUG] Block {} is regular - creating full-width connector",
+                    block_idx
+                );
+                // Create full-width connector for regular blocks
+                if let Some(connector_element) = self.create_full_width_connector(
+                    connector_state,
+                    block,
+                    left_x_end,
+                    right_x_start,
+                    color,
                 ) {
-                    // Use actual rendered positions - align with line rectangles
-                    let left_y_start = left_start_rect.top();
-                    let left_y_end = left_end_rect.bottom();
-                    let right_y_start = right_start_rect.top();
-                    let right_y_end = right_end_rect.bottom();
-
-                    // Clean connector coordinates - use actual content boundaries for seamless connection
-                    let x1 = left_start_rect.max.x; // Exact right edge of left content
-                    let x2 = right_start_rect.min.x; // Exact left edge of right content
-
-                    // Determine color based on Imara block operation (prioritize over line types)
-                    let color = match operation {
-                        crate::diff::imara::ImaraBlockOperation::Modify => {
-                            // All Modify blocks should be blue
-                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
-                        }
-                        crate::diff::imara::ImaraBlockOperation::Insert => {
-                            // Addition: green
-                            egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64)
-                        }
-                        crate::diff::imara::ImaraBlockOperation::Delete => {
-                            // Deletion: red
-                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
-                        }
-                    };
-
-                    // Draw connector between the two blocks
-                    self.draw_connector(
-                        ui,
-                        x1,
-                        left_y_start,
-                        left_y_end,
-                        x2,
-                        right_y_start,
-                        right_y_end,
-                        color,
+                    eprintln!(
+                        "[DEBUG] Block {} connector element created successfully",
+                        block_idx
+                    );
+                    elements.push(connector_element);
+                } else {
+                    eprintln!(
+                        "[DEBUG] Block {} connector element creation failed",
+                        block_idx
                     );
                 }
             }
         }
+
+        eprintln!(
+            "[DEBUG] generate_connector_elements returning {} elements (left_scroll_offset={:.1}, right_scroll_offset={:.1})",
+            elements.len(),
+            connector_state.left_scroll_offset,
+            connector_state.right_scroll_offset
+        );
+
+        elements
     }
 
-    /// Draw connector (restored from original working version)
-    fn draw_connector(
+    /// Create a dual-curve ribbon connector that fills the area between top and bottom curves
+    fn create_dual_curve_connector(
         &self,
-        ui: &mut egui::Ui,
-        x1: f32,
-        y1_start: f32,
-        y1_end: f32,
-        x2: f32,
-        y2_start: f32,
-        y2_end: f32,
-        color: egui::Color32,
-    ) {
-        use egui::{epaint::Mesh, epaint::Vertex, Pos2};
+        left_x: f32,
+        left_y_start: f32,
+        left_y_end: f32,
+        right_x: f32,
+        right_y_start: f32,
+        right_y_end: f32,
+        color: gpui::Hsla,
+    ) -> gpui::AnyElement {
+        let segments = 32;
+        let control_point_offset = (right_x - left_x) * 0.35;
 
-        let segments = 32; // Use high resolution for a perfectly smooth curve.
-        let mut top_points = Vec::with_capacity(segments + 1);
-        let mut bottom_points = Vec::with_capacity(segments + 1);
+        // Use original coordinates without scaling
 
-        let control_point_offset = (x2 - x1) * 0.35;
+        // Generate top curve points
+        let mut top_points = Vec::new();
+        let mut bottom_points = Vec::new();
 
-        // 1. Generate the points for the top and bottom curves.
         for i in 0..=segments {
             let t = i as f32 / segments as f32;
 
-            // Top curve (left to right)
-            let top_start = Pos2::new(x1, y1_start);
-            let top_end = Pos2::new(x2, y2_start);
-            let top_ctrl1 = Pos2::new(top_start.x + control_point_offset, top_start.y);
-            let top_ctrl2 = Pos2::new(top_end.x - control_point_offset, top_end.y);
-            top_points.push(self.cubic_bezier(top_start, top_ctrl1, top_ctrl2, top_end, t));
-
-            // Bottom curve (left to right)
-            let bottom_start = Pos2::new(x1, y1_end);
-            let bottom_end = Pos2::new(x2, y2_end);
-            let bottom_ctrl1 = Pos2::new(bottom_start.x + control_point_offset, bottom_start.y);
-            let bottom_ctrl2 = Pos2::new(bottom_end.x - control_point_offset, bottom_end.y);
-            bottom_points.push(self.cubic_bezier(
-                bottom_start,
-                bottom_ctrl1,
-                bottom_ctrl2,
-                bottom_end,
+            // Top curve (left_start to right_start)
+            let top_point = self.cubic_bezier(
+                (left_x, left_y_start),
+                (left_x + control_point_offset, left_y_start),
+                (right_x - control_point_offset, right_y_start),
+                (right_x, right_y_start),
                 t,
-            ));
+            );
+            top_points.push(top_point);
+
+            // Bottom curve (left_end to right_end)
+            let bottom_point = self.cubic_bezier(
+                (left_x, left_y_end),
+                (left_x + control_point_offset, left_y_end),
+                (right_x - control_point_offset, right_y_end),
+                (right_x, right_y_end),
+                t,
+            );
+            bottom_points.push(bottom_point);
         }
 
-        // 2. Build the mesh using a triangle strip.
-        // This gives us direct control over rendering and avoids the PathShape artifacts.
-        let mut mesh = Mesh::default();
+        // Create ribbon by filling between top and bottom curves
+        let mut elements = Vec::new();
+
         for i in 0..segments {
             let top_left = top_points[i];
             let top_right = top_points[i + 1];
             let bottom_left = bottom_points[i];
             let bottom_right = bottom_points[i + 1];
 
-            // Create a quad from two triangles.
-            let top_left_idx = mesh.vertices.len() as u32;
-            mesh.vertices.push(Vertex {
-                pos: top_left,
-                uv: Pos2::ZERO,
-                color,
-            });
-            let top_right_idx = mesh.vertices.len() as u32;
-            mesh.vertices.push(Vertex {
-                pos: top_right,
-                uv: Pos2::ZERO,
-                color,
-            });
-            let bottom_left_idx = mesh.vertices.len() as u32;
-            mesh.vertices.push(Vertex {
-                pos: bottom_left,
-                uv: Pos2::ZERO,
-                color,
-            });
-            let bottom_right_idx = mesh.vertices.len() as u32;
-            mesh.vertices.push(Vertex {
-                pos: bottom_right,
-                uv: Pos2::ZERO,
-                color,
-            });
+            // Calculate the rectangular strip between curves
+            let min_x = top_left
+                .0
+                .min(top_right.0)
+                .min(bottom_left.0)
+                .min(bottom_right.0);
+            let max_x = top_left
+                .0
+                .max(top_right.0)
+                .max(bottom_left.0)
+                .max(bottom_right.0);
+            let min_y = top_left
+                .1
+                .min(top_right.1)
+                .min(bottom_left.1)
+                .min(bottom_right.1);
+            let max_y = top_left
+                .1
+                .max(top_right.1)
+                .max(bottom_left.1)
+                .max(bottom_right.1);
 
-            // Triangle 1: Top-left, top-right, bottom-left
-            mesh.add_triangle(top_left_idx, top_right_idx, bottom_left_idx);
-            // Triangle 2: Top-right, bottom-right, bottom-left
-            mesh.add_triangle(top_right_idx, bottom_right_idx, bottom_left_idx);
+            elements.push(
+                div()
+                    .absolute()
+                    .left(px(min_x))
+                    .top(px(min_y))
+                    .w(px(max_x - min_x))
+                    .h(px(max_y - min_y))
+                    .bg(color)
+                    .into_any_element(),
+            );
         }
 
-        // 3. Add the custom mesh to the painter.
-        ui.painter().add(egui::Shape::Mesh(mesh.into()));
+        // Find overall bounds for container
+        let all_points = [&top_points[..], &bottom_points[..]].concat();
+        let min_x = all_points
+            .iter()
+            .map(|(x, _)| *x)
+            .fold(f32::INFINITY, f32::min);
+        let max_x = all_points
+            .iter()
+            .map(|(x, _)| *x)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let min_y = all_points
+            .iter()
+            .map(|(_, y)| *y)
+            .fold(f32::INFINITY, f32::min);
+        let max_y = all_points
+            .iter()
+            .map(|(_, y)| *y)
+            .fold(f32::NEG_INFINITY, f32::max);
+
+        div()
+            .absolute()
+            .left(px(min_x))
+            .top(px(min_y))
+            .w(px(max_x - min_x))
+            .h(px(max_y - min_y))
+            .children(elements)
+            .into_any_element()
     }
 
-    /// Simple, reliable cubic bezier calculation.
-    fn cubic_bezier(&self, p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, t: f32) -> Pos2 {
-        let u = 1.0 - t;
-        let u2 = u * u;
-        let u3 = u2 * u;
+    /// Create a full-width connector element that spans the entire gutter
+    fn create_full_width_connector(
+        &self,
+        connector_state: &ConnectorState,
+        block: &crate::diff::imara::ImaraDiffBlock,
+        left_x: f32,
+        right_x: f32,
+        color: gpui::Hsla,
+    ) -> Option<gpui::AnyElement> {
+        let default_bounds = gpui::Bounds::default();
+        let left_start_rect = connector_state
+            .get_left_rect(block.left_range.start)
+            .unwrap_or(&default_bounds);
+        let left_end_rect = connector_state
+            .get_left_rect(block.left_range.end.saturating_sub(1))
+            .unwrap_or(left_start_rect);
+        let right_start_rect = connector_state
+            .get_right_rect(block.right_range.start)
+            .unwrap_or(&default_bounds);
+        let right_end_rect = connector_state
+            .get_right_rect(block.right_range.end.saturating_sub(1))
+            .unwrap_or(right_start_rect);
+
+        let (mut left_y_start, mut left_y_end, mut right_y_start, mut right_y_end) =
+            ConnectorUtils::calculate_connector_coords(
+                left_start_rect,
+                left_end_rect,
+                right_start_rect,
+                right_end_rect,
+                connector_state.left_scroll_offset,
+                connector_state.right_scroll_offset,
+            );
+
+        eprintln!(
+            "[DEBUG] Rect bounds -> left_start: {:?}, left_end: {:?}, right_start: {:?}, right_end: {:?}",
+            left_start_rect,
+            left_end_rect,
+            right_start_rect,
+            right_end_rect
+        );
+
+        let left_block_height = left_y_end - left_y_start;
+        let right_block_height = right_y_end - right_y_start;
+
+        eprintln!(
+            "[DEBUG] Block heights -> left={:.1}, right={:.1}, delta={:.1}",
+            left_block_height,
+            right_block_height,
+            (right_block_height - left_block_height).abs()
+        );
+
+        eprintln!(
+            "[DEBUG] Raw connector coords: left=({:.1}, {:.1}), right=({:.1}, {:.1}), scroll_offsets=({:.1}, {:.1})",
+            left_y_start,
+            left_y_end,
+            right_y_start,
+            right_y_end,
+            connector_state.left_scroll_offset,
+            connector_state.right_scroll_offset
+        );
+
+        let adjusted_left_y_end = left_y_end + 1.0;
+        let adjusted_right_y_end = right_y_end + 1.0;
+
+        eprintln!(
+            "[DEBUG] Final connector coords: left=({:.1}, {:.1}), right=({:.1}, {:.1})",
+            left_y_start, adjusted_left_y_end, right_y_start, adjusted_right_y_end
+        );
+
+        Some(self.create_dual_curve_connector(
+            left_x,
+            left_y_start,
+            adjusted_left_y_end,
+            right_x,
+            right_y_start,
+            adjusted_right_y_end,
+            color,
+        ))
+    }
+
+    /// Cubic Bezier curve calculation helper
+    fn cubic_bezier(
+        &self,
+        p0: (f32, f32),
+        p1: (f32, f32),
+        p2: (f32, f32),
+        p3: (f32, f32),
+        t: f32,
+    ) -> (f32, f32) {
+        let mt = 1.0 - t;
+        let mt2 = mt * mt;
+        let mt3 = mt2 * mt;
         let t2 = t * t;
         let t3 = t2 * t;
-        Pos2 {
-            x: u3 * p0.x + 3.0 * u2 * t * p1.x + 3.0 * u * t2 * p2.x + t3 * p3.x,
-            y: u3 * p0.y + 3.0 * u2 * t * p1.y + 3.0 * u * t2 * p2.y + t3 * p3.y,
-        }
-    }
-}
 
-impl Default for LayoutManager {
-    fn default() -> Self {
-        Self::with_default_config()
+        let x = mt3 * p0.0 + 3.0 * mt2 * t * p1.0 + 3.0 * mt * t2 * p2.0 + t3 * p3.0;
+        let y = mt3 * p0.1 + 3.0 * mt2 * t * p1.1 + 3.0 * mt * t2 * p2.1 + t3 * p3.1;
+
+        (x, y)
     }
 }

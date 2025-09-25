@@ -1,197 +1,166 @@
 // src/rendering/text_renderer.rs
-// Text rendering logic extracted from ui/line_renderer.rs
+// Text rendering logic for GPUI - Native Implementation
 
-use egui::{Color32, FontId, FontFamily, Pos2, Align2};
 use crate::models::line::{DisplayLine, LineType};
 use crate::syntax::SyntaxHighlighter;
 use crate::theme::JetBrainsTheme;
+use gpui::*;
 
 /// Text renderer for handling complex text rendering operations
+#[derive(Clone)]
 pub struct TextRenderer {
-    pub theme: JetBrainsTheme,
-    pub syntax_highlighter: SyntaxHighlighter,
+    syntax_highlighter: SyntaxHighlighter,
 }
 
 impl TextRenderer {
-    pub fn new(theme: JetBrainsTheme) -> Self {
+    pub fn new() -> Self {
         Self {
             syntax_highlighter: SyntaxHighlighter::new(),
-            theme,
         }
     }
 
-    /// Render line number with enhanced styling
-    pub fn render_line_number(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: egui::Rect, baseline_y: f32) {
-        if let Some(line_num) = line.original_line_num {
-            // Standardized positioning calculation for both panes
-            let line_num_pos = Pos2::new(rect.min.x + 30.0, baseline_y);
+    /// Render syntax-highlighted line content using GPUI
+    pub fn render_syntax_highlighted_line_gpui(
+        &self,
+        line: &DisplayLine,
+        theme: &JetBrainsTheme,
+    ) -> impl gpui::IntoElement {
+        let tokens = self.syntax_highlighter.highlight_line(&line.content);
 
-            ui.painter().text(
-                line_num_pos,
-                Align2::RIGHT_BOTTOM,
-                format!("{}", line_num),
-                FontId::new(self.theme.buffer_font_size() * 0.85, FontFamily::Monospace),
-                self.theme.line_numbers,
-            );
-        }
-    }
+        if tokens.is_empty() {
+            // No tokens, render as plain text with proper font styling
+            div()
+                .text_sm()
+                .text_color(self.get_text_color_gpui(&line.content, theme))
+                .font_family(".SF Mono, Consolas, 'Liberation Mono', Menlo, monospace")
+                .child(line.content.clone())
+        } else {
+            // Render tokens with syntax highlighting and preserved whitespace
+            div()
+                .flex()
+                .flex_row()
+                .font_family(".SF Mono, Consolas, 'Liberation Mono', Menlo, monospace")
+                .text_sm()
+                .children(
+                    tokens
+                        .iter()
+                        .enumerate()
+                        .map(|(i, token)| {
+                            let token_color = self.get_token_color_gpui(
+                                &token.token_type,
+                                &line.line_type,
+                                theme,
+                            );
 
-    /// Render code content with JetBrains syntax highlighting
-    pub fn render_content(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: egui::Rect, baseline_y: f32) {
-        if !line.content.is_empty() {
-            let content_start_x = self.theme.gutter_width;
+                            // Check if we need to add whitespace before this token
+                            let needs_space = if i > 0 {
+                                let prev_token = &tokens[i - 1];
+                                // Add space if there's a gap between tokens in the original text
+                                token.start > prev_token.end
+                            } else {
+                                false
+                            };
 
-            // Get syntax-highlighted tokens
-            let tokens = self.syntax_highlighter.highlight_line(&line.content);
+                            // Create elements: optional space + token
+                            let mut elements = Vec::new();
 
-            if tokens.is_empty() {
-                // Fallback to single-color text if no tokens
-                let text_color = self.get_text_color(&line.content);
-                let final_text_color = match line.line_type {
-                    LineType::Deletion => self.theme.deletion_foreground,
-                    LineType::Addition => self.theme.addition_foreground,
-                    LineType::Modification => self.theme.modification_foreground,
-                    _ => text_color,
-                };
-
-                let text_pos = Pos2::new(rect.min.x + content_start_x, baseline_y);
-                ui.painter().text(
-                    text_pos,
-                    Align2::LEFT_BOTTOM,
-                    &line.content,
-                    self.theme.buffer_font_id(),
-                    final_text_color,
-                );
-            } else {
-                // Render with syntax highlighting token by token
-                let mut current_x = rect.min.x + content_start_x;
-                let mut current_char_idx = 0;
-
-                for token in tokens {
-                    // Apply diff-specific colors over syntax highlighting
-                    let token_color = match line.line_type {
-                        LineType::Addition => {
-                            // For addition lines, blend syntax color with addition foreground
-                            use crate::syntax::colors::JetBrainsColors;
-                            let syntax_color = JetBrainsColors::get_color_for_token(&token.token_type);
-                            self.blend_colors(syntax_color, self.theme.addition_foreground, 0.7)
-                        }
-                        LineType::Deletion => {
-                            // For deletion lines, blend syntax color with deletion foreground
-                            use crate::syntax::colors::JetBrainsColors;
-                            let syntax_color = JetBrainsColors::get_color_for_token(&token.token_type);
-                            self.blend_colors(syntax_color, self.theme.deletion_foreground, 0.7)
-                        }
-                        LineType::Modification => {
-                            // For modification lines, blend syntax color with modification foreground
-                            use crate::syntax::colors::JetBrainsColors;
-                            let syntax_color = JetBrainsColors::get_color_for_token(&token.token_type);
-                            self.blend_colors(syntax_color, self.theme.modification_foreground, 0.7)
-                        }
-                        _ => {
-                            // For context lines, use pure syntax highlighting
-                            use crate::syntax::colors::JetBrainsColors;
-                            JetBrainsColors::get_color_for_token(&token.token_type)
-                        }
-                    };
-
-                    // Render any whitespace before this token
-                    while current_char_idx < token.start {
-                        if let Some(ch) = line.content.chars().nth(current_char_idx) {
-                            if ch.is_whitespace() {
-                                let space_width = self.theme.char_width() * if ch == '\t' { 4.0 } else { 1.0 };
-                                current_x += space_width;
+                            if needs_space {
+                                let prev_token = &tokens[i - 1];
+                                // Add space - use the actual whitespace from original text
+                                let space_text =
+                                    line.content[prev_token.end..token.start].to_string();
+                                elements.push(div().child(space_text).into_any_element());
                             }
-                        }
-                        current_char_idx += 1;
-                    }
 
-                    // Render the token
-                    ui.painter().text(
-                        Pos2::new(current_x, baseline_y),
-                        Align2::LEFT_BOTTOM,
-                        &token.text,
-                        self.theme.buffer_font_id(),
-                        token_color,
-                    );
+                            elements.push(
+                                div()
+                                    .text_color(token_color)
+                                    .child(token.text.clone())
+                                    .into_any_element(),
+                            );
 
-                    // Calculate the width of the rendered token
-                    let text_width = ui
-                        .painter()
-                        .layout_no_wrap(
-                            token.text.clone(),
-                            self.theme.buffer_font_id(),
-                            Color32::TRANSPARENT,
-                        )
-                        .size()
-                        .x;
-
-                    current_x += text_width;
-                    current_char_idx = token.end;
-                }
-            }
+                            div()
+                                .flex()
+                                .flex_row()
+                                .children(elements)
+                                .into_any_element()
+                        })
+                        .collect::<Vec<_>>(),
+                )
         }
     }
 
-    /// Render word-level highlights for modifications
-    pub fn render_word_highlights(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: egui::Rect, baseline_y: f32) {
-        if (line.line_type == LineType::Context || line.line_type == LineType::Modification)
-            && !line.word_highlights.is_empty()
+    /// Get text color for GPUI rendering with enhanced syntax detection
+    fn get_text_color_gpui(&self, content: &str, theme: &JetBrainsTheme) -> gpui::Hsla {
+        let trimmed = content.trim();
+
+        if trimmed.starts_with("//") || trimmed.starts_with("#") {
+            theme.code_comment
+        } else if trimmed.contains("fn ")
+            || trimmed.contains("let ")
+            || trimmed.contains("const ")
+            || trimmed.contains("struct ")
+            || trimmed.contains("enum ")
+            || trimmed.contains("impl ")
+            || trimmed.contains("pub ")
+            || trimmed.contains("use ")
+            || trimmed.contains("import ")
+            || trimmed.contains("export ")
+            || trimmed.contains("function ")
         {
-            let char_count = line.content.chars().count();
-            for (start, end, highlight_type) in &line.word_highlights {
-                let char_start = line.content[..*start].chars().count();
-                let char_end = line.content[..*end].chars().count();
-                if char_start < char_count && char_end <= char_count && char_start < char_end {
-                    let char_width = self.theme.char_width(); // Use Zed-calculated character width
-                    let highlight_start_x =
-                        60.0 + (char_start as f32 * char_width) - (1.5 * char_width);
-                    let highlight_width = (char_end - char_start) as f32 * char_width;
-
-                    // Render highlight background based on type
-                    let highlight_color = match highlight_type {
-                        crate::models::line::HighlightType::Insert => {
-                            Color32::from_rgba_unmultiplied(40, 167, 69, 80) // Vert pour insertion
-                        }
-                        crate::models::line::HighlightType::Delete => {
-                            Color32::from_rgba_unmultiplied(33, 150, 243, 80) // Bleu pour suppression (au lieu de rouge)
-                        }
-                    };
-
-                    let highlight_rect = egui::Rect::from_min_size(
-                        Pos2::new(
-                            rect.min.x + highlight_start_x,
-                            rect.min.y + (baseline_y - rect.min.y) - self.theme.buffer_font_size(),
-                        ),
-                        egui::Vec2::new(highlight_width, self.theme.buffer_font_size() + 2.0),
-                    );
-
-                    ui.painter()
-                        .rect_filled(highlight_rect, 2.0, highlight_color);
-                }
-            }
+            theme.code_keyword
+        } else if trimmed.contains("\"") || trimmed.contains("'") {
+            theme.code_string
+        } else {
+            theme.code_foreground
         }
     }
 
-    /// Get text color based on content analysis
-    fn get_text_color(&self, _content: &str) -> Color32 {
-        self.theme.foreground
+    /// Get color for a specific token with line type blending
+    fn get_token_color_gpui(
+        &self,
+        token_type: &crate::syntax::token_types::TokenType,
+        line_type: &LineType,
+        theme: &JetBrainsTheme,
+    ) -> gpui::Hsla {
+        use crate::syntax::colors::JetBrainsColors;
+
+        let base_color = JetBrainsColors::get_color_for_token(token_type);
+
+        // Blend with line type colors for diff highlighting
+        match line_type {
+            LineType::Addition => {
+                self.blend_colors_gpui(base_color, theme.addition_foreground, 0.7)
+            }
+            LineType::Deletion => {
+                self.blend_colors_gpui(base_color, theme.deletion_foreground, 0.7)
+            }
+            LineType::Modification => {
+                self.blend_colors_gpui(base_color, theme.modification_foreground, 0.7)
+            }
+            LineType::Context => base_color,
+        }
     }
 
-    /// Blend two colors with a given weight (from original line_renderer.rs)
-    fn blend_colors(&self, syntax_color: Color32, line_color: Color32, syntax_weight: f32) -> Color32 {
+    /// Blend two GPUI colors with a given weight
+    fn blend_colors_gpui(
+        &self,
+        syntax_color: gpui::Hsla,
+        line_color: gpui::Hsla,
+        syntax_weight: f32,
+    ) -> gpui::Hsla {
         let line_weight = 1.0 - syntax_weight;
 
-        let r = (syntax_color.r() as f32 * syntax_weight + line_color.r() as f32 * line_weight) as u8;
-        let g = (syntax_color.g() as f32 * syntax_weight + line_color.g() as f32 * line_weight) as u8;
-        let b = (syntax_color.b() as f32 * syntax_weight + line_color.b() as f32 * line_weight) as u8;
-        let a = (syntax_color.a() as f32 * syntax_weight + line_color.a() as f32 * line_weight) as u8;
+        // Convert to linear RGB for blending
+        let syntax_rgba = syntax_color.to_rgb();
+        let line_rgba = line_color.to_rgb();
 
-        Color32::from_rgba_unmultiplied(r, g, b, a)
-    }
+        let r = syntax_rgba.r * syntax_weight + line_rgba.r * line_weight;
+        let g = syntax_rgba.g * syntax_weight + line_rgba.g * line_weight;
+        let b = syntax_rgba.b * syntax_weight + line_rgba.b * line_weight;
+        let a = syntax_rgba.a * syntax_weight + line_rgba.a * line_weight;
 
-    /// Update theme for the text renderer
-    pub fn update_theme(&mut self, theme: JetBrainsTheme) {
-        self.theme = theme;
+        // Create RGBA color from blended components
+        gpui::Rgba { r, g, b, a }.into()
     }
 }

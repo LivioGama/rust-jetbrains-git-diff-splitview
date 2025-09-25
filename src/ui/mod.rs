@@ -3,4 +3,5 @@ pub mod layout;
 pub mod line_renderer;
 
 pub use connector_renderer::*;
+pub use layout::*;
 pub use line_renderer::*;

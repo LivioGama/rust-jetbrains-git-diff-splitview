@@ -21,6 +21,7 @@ Never do something different from what I ask, for example, removing a feature fo
 
 # Rust
 
+Never run `cargo build`.
 Never run `cargo run`, run `cargo check` instead. I always watch files.
 
 Try to keep your files short (under 250 lines), and the architecture modular.
@@ -32,3 +33,5 @@ Don't write any tests / unit tests unless explicitly asked for.
 Never create demo files or example or tests unless explicitly asked for.
 
 Never run cargo run, instead cargo check. Never write tests. Go straight to the point, edit aggressively the existing rather than creating parallel version to demo.
+
+cc means: run `cargo check`

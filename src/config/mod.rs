@@ -1,72 +1,47 @@
-// diffsplit/src/config/mod.rs
-// Application configuration module
-
+// Configuration module
 pub mod app_config;
 pub mod editor_settings;
-pub mod fonts;
 
+// Re-export for convenience
 pub use app_config::*;
-pub use editor_settings::*;
-pub use fonts::*;
+// Editor settings module (currently unused)
+// pub use editor_settings::*;
 
-/// Application configuration
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub struct AppConfig {
-    pub layout: LayoutConfig,
-    pub fonts: ZedFontConfig,
-    pub editor: ZedSettings,
-}
-
-/// Layout configuration
+/// Layout configuration for the diff viewer
 #[derive(Debug, Clone)]
 pub struct LayoutConfig {
-    pub connector_column_width: f32,
     pub pane_padding: f32,
+    pub connector_column_width: f32,
 }
 
 impl Default for LayoutConfig {
     fn default() -> Self {
         Self {
-            connector_column_width: 45.0,
-            pane_padding: 10.0,
+            pane_padding: 8.0,
+            connector_column_width: 90.0,
         }
     }
 }
 
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            layout: LayoutConfig::default(),
-            fonts: ZedFontConfig::default(),
-            editor: ZedSettings::default(),
-        }
-    }
-}
-
-/// Configuration manager
+/// Configuration manager for the entire application
+#[derive(Debug, Clone)]
 pub struct ConfigManager {
-    config: AppConfig,
-    font_manager: ZedFontManager,
+    pub layout: LayoutConfig,
 }
 
 impl ConfigManager {
+    /// Create a new configuration manager with default settings
     pub fn new() -> Self {
-        let config = AppConfig::default();
-        let font_manager = ZedFontManager::with_config(config.fonts.clone());
+        let config = ConfigManager {
+            layout: LayoutConfig::default(),
+        };
 
-        Self {
-            config,
-            font_manager,
-        }
+        config
     }
 
-    pub fn get_config(&self) -> &AppConfig {
-        &self.config
-    }
-
-    pub fn get_font_manager(&self) -> &ZedFontManager {
-        &self.font_manager
+    /// Get reference to the layout configuration
+    pub fn get_config(&self) -> &ConfigManager {
+        self
     }
 }
 

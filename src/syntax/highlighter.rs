@@ -3,7 +3,7 @@
 
 use super::colors::JetBrainsColors;
 use super::token_types::{ColoredToken, TokenType};
-use egui::Color32;
+use gpui::*;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -257,7 +257,7 @@ impl SyntaxHighlighter {
     }
 
     /// Get color for a token type
-    pub fn get_color_for_token(&self, token_type: &TokenType) -> Color32 {
+    pub fn get_color_for_token(&self, token_type: &TokenType) -> gpui::Hsla {
         JetBrainsColors::get_color_for_token(token_type)
     }
 }

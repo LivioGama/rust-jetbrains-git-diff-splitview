@@ -8,7 +8,7 @@ pub enum MasterPane {
     Right,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ScrollSync {
     master_pane: MasterPane,
     left_scroll_offset: f32,
@@ -17,6 +17,37 @@ pub struct ScrollSync {
     line_height: f32,
     // Cache for frequent calculations
     cached_half_viewport: f32,
+}
+
+// Make scroll_sync reactive by implementing reactive methods
+impl ScrollSync {
+    pub fn update_left_scroll(&mut self, offset: f32) -> bool {
+        if self.left_scroll_offset != offset {
+            self.left_scroll_offset = offset;
+            self.master_pane = MasterPane::Left;
+            true // Changed
+        } else {
+            false // No change
+        }
+    }
+
+    pub fn update_right_scroll(&mut self, offset: f32) -> bool {
+        if self.right_scroll_offset != offset {
+            self.right_scroll_offset = offset;
+            self.master_pane = MasterPane::Right;
+            true // Changed
+        } else {
+            false // No change
+        }
+    }
+
+    pub fn get_left_scroll(&self) -> f32 {
+        self.left_scroll_offset
+    }
+
+    pub fn get_right_scroll(&self) -> f32 {
+        self.right_scroll_offset
+    }
 }
 
 impl ScrollSync {

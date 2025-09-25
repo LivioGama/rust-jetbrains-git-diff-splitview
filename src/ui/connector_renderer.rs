@@ -1,9 +1,22 @@
-// Connector rendering logic for diff viewer
-use egui::{Color32, Pos2, Rect};
+// Connector rendering logic for diff viewer - GPUI Native Implementation
+use gpui::Hsla;
+use gpui::*;
 
-use crate::models::line::LineType;
+use crate::diff::imara::ImaraDiffAnalysis;
+use crate::models::line::DisplayLine;
+
+use crate::models::ui::{ConnectorCurve, ConnectorOperation};
+use crate::sync::ScrollSync;
 use crate::theme::JetBrainsTheme;
 
+// Add logging for debugging connector coordinates
+macro_rules! log_connector_coords {
+    ($msg:expr, $($arg:tt)*) => {
+        eprintln!("[CONNECTOR] {}", format_args!($msg, $($arg)*));
+    };
+}
+
+#[derive(Clone)]
 pub struct ConnectorRenderer {
     theme: JetBrainsTheme,
 }
@@ -13,329 +26,309 @@ impl ConnectorRenderer {
         Self { theme }
     }
 
-    pub fn draw_connection_lines(
-        &self,
-        _ui: &mut egui::Ui,
-        _old_lines: &[crate::models::line::DisplayLine],
-        _new_lines: &[crate::models::line::DisplayLine],
-    ) {
-        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
-        // This prevents duplicate/overlapping connector rendering
-    }
+    /// Generate div elements for a Bézier curve approximated by many thin dots along the path
+    fn bezier_curve_to_divs(
+        start: (f32, f32),
+        control1: (f32, f32),
+        control2: (f32, f32),
+        end: (f32, f32),
+        color: gpui::Hsla,
+        segments: usize,
+    ) -> Vec<gpui::AnyElement> {
+        let mut elements = Vec::new();
+        let thickness = 2.0; // Thin dots
 
-    fn draw_filled_connector_region(
-        &self,
-        _painter: &egui::Painter,
-        _curve: &crate::models::ui::ConnectorCurve,
-        _block_height: f32,
-        _left_block_height: f32,
-        _right_block_height: f32,
-        _left_rects: &[Rect],
-        _right_rects: &[Rect],
-        _left_start: usize,
-        _left_end: usize,
-        _right_start: usize,
-        _right_end: usize,
-    ) {
-        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
-        // This prevents duplicate/overlapping connector rendering
-        /*
-        // Calculate semi-transparent fill color using consistent alpha method
-        let fill_color = Color32::from_rgba_unmultiplied(
-            curve.color.r(),
-            curve.color.g(),
-            curve.color.b(),
-            64  // Consistent with theme alpha values
-        );
+        for i in 0..=segments {
+            let t = i as f32 / segments as f32;
 
-        // Use actual line rectangles to calculate the filled region bounds
-        if left_start < left_rects.len() && right_start < right_rects.len() {
-            let left_first_rect = &left_rects[left_start];
-            let left_last_rect = &left_rects[left_end.min(left_rects.len() - 1)];
-            let right_first_rect = &right_rects[right_start];
-            let right_last_rect = &right_rects[right_end.min(right_rects.len() - 1)];
+            // Cubic Bézier formula
+            let t2 = t * t;
+            let t3 = t2 * t;
+            let mt = 1.0 - t;
+            let mt2 = mt * mt;
+            let mt3 = mt2 * mt;
 
-            // Calculate precise bounds for better alignment
-            let left_max_x = left_first_rect.max.x - 5.0; // Slightly inset from line edge
-            let right_min_x = right_first_rect.min.x + 5.0; // Slightly inset from line edge
+            let x = mt3 * start.0
+                + 3.0 * mt2 * t * control1.0
+                + 3.0 * mt * t2 * control2.0
+                + t3 * end.0;
+            let y = mt3 * start.1
+                + 3.0 * mt2 * t * control1.1
+                + 3.0 * mt * t2 * control2.1
+                + t3 * end.1;
 
-            // Use exact line bounds for vertical alignment
-            let top_y = left_first_rect.min.y.min(right_first_rect.min.y);
-            let bottom_y = left_last_rect.max.y.max(right_last_rect.max.y);
-
-            // Create rectangle covering the connector area with precise alignment
-            let block_rect = Rect::from_min_max(
-                Pos2::new(left_max_x, top_y),
-                Pos2::new(right_min_x, bottom_y),
+            // Create a small dot at each point along the curve
+            elements.push(
+                div()
+                    .absolute()
+                    .left(px(x - thickness / 2.0))
+                    .top(px(y - thickness / 2.0))
+                    .w(px(thickness))
+                    .h(px(thickness))
+                    .bg(color)
+                    .into_any_element(),
             );
-
-            // Fill the rectangle with semi-transparent color
-            painter.add(egui::epaint::Shape::rect_filled(
-                block_rect, 2.0, // Slight corner radius for better aesthetics
-                fill_color,
-            ));
         }
-        */
+
+        elements
     }
 
-    pub fn draw_change_block_connection(
-        &self,
-        _ui: &mut egui::Ui,
-        _change_type: &str,
-        _left_start: usize,
-        _left_end: usize,
-        _right_start: usize,
-        _right_end: usize,
-        _left_rects: &[Rect],
-        _right_rects: &[Rect],
-    ) {
-        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
-        // This prevents duplicate/overlapping connector rendering
-        /*
-        if left_start >= left_rects.len() || right_start >= right_rects.len() {
-            return;
-        }
+    /// Calculate control points for an S-shaped connector curve
+    fn calculate_s_curve_control_points(
+        left_start_y: f32,
+        left_end_y: f32,
+        right_start_y: f32,
+        right_end_y: f32,
+        connector_width: f32,
+    ) -> ((f32, f32), (f32, f32), (f32, f32), (f32, f32)) {
+        let left_center_y = (left_start_y + left_end_y) / 2.0;
+        let right_center_y = (right_start_y + right_end_y) / 2.0;
 
-        let painter = ui.painter();
+        let start_point = (0.0, left_center_y);
+        let end_point = (connector_width, right_center_y);
 
-        // Use theme-based color based on change type
-        let line_type = match change_type {
-            "addition" => crate::models::line::LineType::Addition,
-            "deletion" => crate::models::line::LineType::Deletion,
-            "modification" => crate::models::line::LineType::Modification, // Modifications use new Modification type
-            _ => crate::models::line::LineType::Context,
-        };
-        let stroke_color = self.theme.get_connector_color(&line_type);
+        // Create a proper S-curve like JetBrains IDEA:
+        // The curve should go out to the right, then curve back toward the center, then out to the right again
+        let curve_amplitude = (left_end_y - left_start_y)
+            .abs()
+            .max((right_end_y - right_start_y).abs())
+            * 0.5;
 
-        // Calculate the vertical span of the change blocks
-        let left_top = left_rects[left_start].min.y;
-        let left_bottom = left_rects[left_end.min(left_rects.len() - 1)].max.y;
-        let right_top = right_rects[right_start].min.y;
-        let right_bottom = right_rects[right_end.min(right_rects.len() - 1)].max.y;
+        // For S-curve: first control point goes outward, second comes back inward
+        let control1_x = connector_width * 0.4;
+        let control2_x = connector_width * 0.6;
 
-        // Connect the top boundaries
-        let start_top = Pos2::new(left_rects[left_start].max.x, left_top);
-        let end_top = Pos2::new(right_rects[right_start].min.x, right_top);
-
-        // Connect the bottom boundaries
-        let start_bottom = Pos2::new(
-            left_rects[left_end.min(left_rects.len() - 1)].max.x,
-            left_bottom,
-        );
-        let end_bottom = Pos2::new(
-            right_rects[right_end.min(right_rects.len() - 1)].min.x,
-            right_bottom,
-        );
-
-        // Draw curved connection lines for the band
-        let control_distance = 40.0;
-
-        // Top curve
-        let control1_top = Pos2::new(start_top.x + control_distance, start_top.y);
-        let control2_top = Pos2::new(end_top.x - control_distance, end_top.y);
-
-        // Bottom curve
-        let control1_bottom = Pos2::new(start_bottom.x + control_distance, start_bottom.y);
-        let control2_bottom = Pos2::new(end_bottom.x - control_distance, end_bottom.y);
-
-        // Collect all points to create the filled polygon path
-        let mut path_points = Vec::new();
-
-        // Add top curve points
-        for i in 0..=32 {
-            let t = i as f32 / 32.0;
-            path_points.push(self.evaluate_cubic_bezier(
-                start_top,
-                control1_top,
-                control2_top,
-                end_top,
-                t,
-            ));
-        }
-
-        // Add bottom curve points (in reverse order to close the shape)
-        for i in (0..=32).rev() {
-            let t = i as f32 / 32.0;
-            path_points.push(self.evaluate_cubic_bezier(
-                start_bottom,
-                control1_bottom,
-                control2_bottom,
-                end_bottom,
-                t,
-            ));
-        }
-
-        // Create and draw the filled shape as a single closed path (single layer, no stroke)
-        let path_shape = egui::epaint::PathShape {
-            points: path_points,
-            closed: true,
-            fill: stroke_color,
-            stroke: egui::epaint::PathStroke::NONE,
-        };
-        painter.add(egui::Shape::Path(path_shape));
-
-        // Using filled curves only - single layer
-        */
-    }
-
-    /// JetBrains-style connector rendering for independent line arrays
-    fn draw_jetbrains_connectors(
-        &self,
-        _ui: &mut egui::Ui,
-        _old_lines: &[crate::models::line::DisplayLine],
-        _new_lines: &[crate::models::line::DisplayLine],
-    ) {
-        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
-        // This prevents duplicate/overlapping connector rendering
-        /*
-        let config = crate::models::ui::ConnectorConfig::default();
-
-        // Find deletion blocks on left side
-        let deletion_blocks = self.find_change_blocks(old_lines, LineType::Deletion);
-
-        // Find addition blocks on right side
-        let addition_blocks = self.find_change_blocks(new_lines, LineType::Addition);
-
-        // Draw deletion connectors (red, pointing from left to middle)
-        for (start, end) in deletion_blocks {
-            if start < left_rects.len() && end < left_rects.len() {
-                let start_rect = &left_rects[start];
-                let end_rect = &left_rects[end];
-
-                let center_y = (start_rect.min.y + end_rect.max.y) / 2.0;
-                let left_point = Pos2::new(start_rect.max.x, center_y);
-                let right_point = Pos2::new(left_point.x + 30.0, center_y);
-
-                self.draw_single_connector(
-                    painter,
-                    left_point,
-                    right_point,
-                    &config,
-                    self.theme.get_connector_color(&LineType::Deletion),
-                    end - start > 0, // Multi-line
-                );
-            }
-        }
-
-        // Draw addition connectors (green, pointing from middle to right)
-        for (start, end) in addition_blocks {
-            if start < right_rects.len() && end < right_rects.len() {
-                let start_rect = &right_rects[start];
-                let end_rect = &right_rects[end];
-
-                let center_y = (start_rect.min.y + end_rect.max.y) / 2.0;
-                let right_point = Pos2::new(start_rect.min.x, center_y);
-                let left_point = Pos2::new(right_point.x - 30.0, center_y);
-
-                self.draw_single_connector(
-                    painter,
-                    left_point,
-                    right_point,
-                    &config,
-                    self.theme.get_connector_color(&LineType::Addition),
-                    end - start > 0, // Multi-line
-                );
-            }
-        }
-        */
-    }
-
-    fn draw_single_connector(
-        &self,
-        _painter: &egui::Painter,
-        _start_point: Pos2,
-        _end_point: Pos2,
-        _color: Color32,
-        _is_multi_line: bool,
-    ) {
-        // DISABLED: All connector rendering is handled by LayoutManager.render_connectors()
-        // This prevents duplicate/overlapping connector rendering
-        /*
-        let curve = crate::models::ui::ConnectorCurve::new(
-            start_point,
-            end_point,
-            config,
-            color,
-            "connector".to_string(),
-        );
-
-        let thickness = if is_multi_line {
-            config.ribbon_width * 1.2
+        // Calculate Y positions to create the S-shape
+        let control1_y = if left_center_y < right_center_y {
+            // Going downward: first control point goes up (outward), second goes down (inward)
+            left_center_y - curve_amplitude * 0.5
+        } else if left_center_y > right_center_y {
+            // Going upward: first control point goes down (outward), second goes up (inward)
+            left_center_y + curve_amplitude * 0.5
         } else {
-            config.ribbon_width * 0.8
+            // Horizontal: no curve
+            left_center_y
         };
 
-        // For single connector, create a simple curved line using convex polygon
-        let mut path_points = Vec::new();
-
-        // Generate curve points
-        for i in 0..=20 {
-            let t = i as f32 / 20.0;
-            path_points.push(self.evaluate_cubic_bezier(
-                curve.start,
-                curve.control1,
-                curve.control2,
-                curve.end,
-                t,
-            ));
-        }
-
-        // Create a complete connector by adding points slightly offset for thickness
-        let mut connector_points = path_points.clone();
-        for point in path_points.iter().rev() {
-            connector_points.push(Pos2::new(point.x, point.y + thickness));
-        }
-
-        // Render as a single closed path (single layer), no stroke
-        let path_shape = egui::epaint::PathShape {
-            points: connector_points,
-            closed: true,
-            fill: color,
-            stroke: egui::epaint::PathStroke::NONE,
+        let control2_y = if left_center_y < right_center_y {
+            right_center_y + curve_amplitude * 0.5
+        } else if left_center_y > right_center_y {
+            right_center_y - curve_amplitude * 0.5
+        } else {
+            right_center_y
         };
-        painter.add(egui::Shape::Path(path_shape));
-        */
+
+        (
+            start_point,
+            (control1_x, control1_y),
+            (control2_x, control2_y),
+            end_point,
+        )
     }
 
-    /// Find change blocks of a specific type in a line array
-    fn find_change_blocks(
+    /// Render connectors using GPUI elements with proper S-curves and scroll sync
+    pub fn render_connectors_gpui(
         &self,
-        lines: &[crate::models::line::DisplayLine],
-        line_type: LineType,
-    ) -> Vec<(usize, usize)> {
-        let mut blocks = Vec::new();
-        let mut i = 0;
+        old_lines: &[DisplayLine],
+        new_lines: &[DisplayLine],
+        header_offset: Pixels,
+        scroll_sync: &mut ScrollSync,
+        imara_analysis: &ImaraDiffAnalysis,
+        left_scroll: f32,
+        right_scroll: f32,
+        viewport_height: Option<f32>,
+        connector_width: f32,
+    ) -> impl IntoElement {
+        log_connector_coords!(
+            "render_connectors_gpui called with viewport_height: {:?}",
+            viewport_height
+        );
+        let line_height = self.theme.line_height();
 
-        while i < lines.len() {
-            if lines[i].line_type == line_type {
-                let start = i;
-                let mut end = i;
-
-                // Find consecutive lines of the same change type
-                while end + 1 < lines.len() && lines[end + 1].line_type == line_type {
-                    end += 1;
+        // Create S-shaped connectors between block corners like JetBrains diff viewer
+        let s_connectors: Vec<_> = imara_analysis
+            .blocks
+            .iter()
+            .filter_map(|block| {
+                // Always try to create connectors if there's any content on both sides
+                if block.left_range.is_empty() && block.right_range.is_empty() {
+                    return None;
                 }
 
-                blocks.push((start, end));
-                i = end + 1;
-            } else {
-                i += 1;
+                log_connector_coords!("Processing block: op={:?}, left_range={:?}, right_range={:?}",
+                    block.operation, block.left_range, block.right_range);
+
+                let color = match &block.operation {
+                    crate::diff::imara::ImaraBlockOperation::Insert => self.theme.addition_background.opacity(1.0),
+                    crate::diff::imara::ImaraBlockOperation::Delete => self.theme.deletion_background.opacity(1.0),
+                    crate::diff::imara::ImaraBlockOperation::Modify => self.theme.modification_background.opacity(1.0),
+                };
+
+                // Calculate Y positions for the block
+                // These are document-relative positions, then adjusted for scroll to get viewport positions
+                let left_start_y_doc = if block.left_range.is_empty() {
+                    // For insertions, use the right side position
+                    (block.right_range.start as f32) * line_height + header_offset.0
+                } else {
+                    (block.left_range.start as f32) * line_height + header_offset.0
+                };
+
+                let left_end_y_doc = if block.left_range.is_empty() {
+                    left_start_y_doc + (block.right_range.end - block.right_range.start) as f32 * line_height
+                } else {
+                    (block.left_range.end as f32) * line_height + header_offset.0
+                };
+
+                let right_start_y_doc = if block.right_range.is_empty() {
+                    // For deletions, use the left side position
+                    (block.left_range.start as f32) * line_height + header_offset.0
+                } else {
+                    (block.right_range.start as f32) * line_height + header_offset.0
+                };
+
+                let right_end_y_doc = if block.right_range.is_empty() {
+                    right_start_y_doc + (block.left_range.end - block.left_range.start) as f32 * line_height
+                } else {
+                    (block.right_range.end as f32) * line_height + header_offset.0
+                };
+
+                // Convert document positions to viewport positions by subtracting scroll offsets
+                // For connectors to stay connected during scrolling, use the scroll offset of the pane
+                // that contains the block. For blocks on both sides, average the positions.
+                let (left_start_y, left_end_y, right_start_y, right_end_y) = if block.left_range.is_empty() {
+                    // Pure insertion: follow right pane scroll
+                    (
+                        left_start_y_doc - right_scroll,
+                        left_end_y_doc - right_scroll,
+                        right_start_y_doc - right_scroll,
+                        right_end_y_doc - right_scroll,
+                    )
+                } else if block.right_range.is_empty() {
+                    // Pure deletion: follow left pane scroll
+                    (
+                        left_start_y_doc - left_scroll,
+                        left_end_y_doc - left_scroll,
+                        right_start_y_doc - left_scroll,
+                        right_end_y_doc - left_scroll,
+                    )
+                } else {
+                    // Modification on both sides: average the scroll positions for smooth connection
+                    let avg_scroll = (left_scroll + right_scroll) / 2.0;
+                    (
+                        left_start_y_doc - avg_scroll,
+                        left_end_y_doc - avg_scroll,
+                        right_start_y_doc - avg_scroll,
+                        right_end_y_doc - avg_scroll,
+                    )
+                };
+
+                log_connector_coords!("Calculated positions: left_y=({:.1}, {:.1}), right_y=({:.1}, {:.1}), left_scroll={:.1}, right_scroll={:.1}",
+                    left_start_y_doc, left_end_y_doc, right_start_y_doc, right_end_y_doc, left_scroll, right_scroll);
+
+                // Include block operation in the data passed to canvas
+                // Store both document and viewport coordinates
+                Some((
+                    left_start_y_doc, left_end_y_doc, right_start_y_doc, right_end_y_doc, // document coords
+                    left_start_y, left_end_y, right_start_y, right_end_y, // viewport coords
+                    color, block.operation.clone()
+                ))
+            })
+            .collect();
+
+        log_connector_coords!("Total connectors to render: {}", s_connectors.len());
+
+        // Render S-shaped connectors using canvas for precise curves
+        let viewport_height = match viewport_height {
+            Some(h) if h > 0.0 => {
+                log_connector_coords!("Using passed viewport height: {:.1}", h);
+                h
             }
+            _ => {
+                log_connector_coords!(
+                    "Using fallback viewport height: 600.0 (passed: {:?})",
+                    viewport_height
+                );
+                600.0
+            }
+        };
+
+        // Pre-calculate curve data to avoid lifetime issues
+        let curve_data: Vec<_> = s_connectors
+            .iter()
+            .map(
+                |&(
+                    _,
+                    _,
+                    _,
+                    _,
+                    left_start_y,
+                    left_end_y,
+                    right_start_y,
+                    right_end_y,
+                    color,
+                    ref operation,
+                )| {
+                    let (start, control1, control2, end) = Self::calculate_s_curve_control_points(
+                        left_start_y,
+                        left_end_y,
+                        right_start_y,
+                        right_end_y,
+                        connector_width,
+                    );
+                    let thickness = match operation {
+                        crate::diff::imara::ImaraBlockOperation::Insert => 8.0,
+                        crate::diff::imara::ImaraBlockOperation::Delete => 8.0,
+                        crate::diff::imara::ImaraBlockOperation::Modify => 7.0,
+                    };
+                    (start, control1, control2, end, color, thickness)
+                },
+            )
+            .collect();
+
+        // Create background elements
+        let mut elements = Vec::new();
+        for &(_, _, _, _, left_start_y, left_end_y, right_start_y, right_end_y, color, _) in
+            &s_connectors
+        {
+            let min_y = left_start_y
+                .min(left_end_y)
+                .min(right_start_y)
+                .min(right_end_y);
+            let max_y = left_start_y
+                .max(left_end_y)
+                .max(right_start_y)
+                .max(right_end_y);
+            let area_height = max_y - min_y;
+            let background_color = color.opacity(0.6);
+            elements.push(
+                div()
+                    .absolute()
+                    .top(px(min_y))
+                    .left(px(0.0))
+                    .w(px(connector_width))
+                    .h(px(area_height))
+                    .bg(background_color)
+                    .into_any_element(),
+            );
         }
 
-        blocks
-    }
+        // Create curve elements with 50 segments for smoother approximation
+        for &(start, control1, control2, end, color, _) in &curve_data {
+            let mut curve_elements =
+                Self::bezier_curve_to_divs(start, control1, control2, end, color, 50);
+            elements.append(&mut curve_elements);
+        }
 
-    fn evaluate_cubic_bezier(&self, p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, t: f32) -> Pos2 {
-        let u = 1.0 - t;
-        let tt = t * t;
-        let uu = u * u;
-        let uuu = uu * u;
-        let ttt = tt * t;
+        // Calculate document height based on maximum lines for proper connector positioning
+        let max_lines = old_lines.len().max(new_lines.len());
+        let document_height = max_lines as f32 * line_height + header_offset.0;
 
-        Pos2::new(
-            uuu * p0.x + 3.0 * uu * t * p1.x + 3.0 * u * tt * p2.x + ttt * p3.x,
-            uuu * p0.y + 3.0 * uu * t * p1.y + 3.0 * u * tt * p2.y + ttt * p3.y,
-        )
+        div()
+            .w(px(connector_width))
+            .h(px(document_height))
+            .bg(self.theme.connector_column)
+            .relative()
+            .children(elements)
+            .into_any_element()
     }
 }

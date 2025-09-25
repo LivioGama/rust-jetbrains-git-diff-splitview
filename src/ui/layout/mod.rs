@@ -1,7 +1,7 @@
 // diffsplit/src/ui/layout/mod.rs
 // UI Layout module for organizing the main application interface
 
-pub mod gutter;
+pub mod connectors;
 pub mod layout_manager;
 pub mod panes;
 

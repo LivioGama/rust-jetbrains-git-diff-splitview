@@ -1,5 +1,6 @@
-// diffsplit/src/app/mod.rs
-use eframe::egui;
+// diffsplit/src/app/mod.rs - GPUI Implementation
+use crate::models::ui::{ConnectorCurve, ConnectorOperation};
+use gpui::*;
 use std::path::PathBuf;
 
 use crate::actions::*;
@@ -19,11 +20,11 @@ pub struct DiffViewerApp {
     pub scroll_sync: ScrollSync,
     pub theme: JetBrainsTheme,
     pub line_renderer: LineRenderer,
-    pub connector_renderer: ConnectorRenderer,
     pub navigation_handler: NavigationHandler,
     pub layout_manager: LayoutManager,
     pub config_manager: ConfigManager,
     pub toolbar_handler: ToolbarHandler,
+    pub connector_renderer: ConnectorRenderer,
 }
 
 impl DiffViewerApp {
@@ -47,17 +48,30 @@ impl DiffViewerApp {
 
         eprintln!("📏 Using line height: {}", line_height);
 
+        let filtered_files: Vec<PathBuf> = project_files
+            .into_iter()
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .map(|name| {
+                        let lower = name.to_ascii_lowercase();
+                        lower != ".ds_store" && lower != "ds_store"
+                    })
+                    .unwrap_or(true)
+            })
+            .collect();
+
         let mut app = Self {
             state_manager,
             action_handler,
             scroll_sync: ScrollSync::new(line_height, viewport_height),
             theme: theme.clone(),
-            line_renderer: LineRenderer::new(theme.clone()),
-            connector_renderer: ConnectorRenderer::new(theme.clone()),
+            line_renderer: LineRenderer::new(),
             navigation_handler: NavigationHandler::new(),
             layout_manager: LayoutManager::new(config_manager.get_config().layout.clone()),
             config_manager,
-            toolbar_handler: ToolbarHandler::new(project_files),
+            toolbar_handler: ToolbarHandler::new(filtered_files),
+            connector_renderer: ConnectorRenderer::new(theme.clone()),
         };
 
         // Load first project file's diff if there are project files
@@ -274,18 +288,28 @@ impl DiffViewerApp {
     }
 }
 
-impl eframe::App for DiffViewerApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Apply Zed font configuration and JetBrains theme
-        self.config_manager.get_font_manager().apply_to_context(ctx);
-        self.theme.apply_to_context(ctx);
+impl gpui::Render for DiffViewerApp {
+    fn render(
+        &mut self,
+        _window: &mut gpui::Window,
+        _cx: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        self.view()
+    }
+}
 
+impl DiffViewerApp {
+    pub fn update(
+        &mut self,
+        _cx: &mut gpui::App,
+        _bounds: gpui::Bounds<gpui::Point<gpui::Pixels>>,
+    ) {
         // Handle keyboard navigation
-        let action = self.navigation_handler.handle_input(ctx);
+        let action = self.navigation_handler.handle_input(_cx);
         self.handle_navigation_action(action);
 
         // Handle toolbar keyboard input
-        let toolbar_action = self.toolbar_handler.handle_input(ctx);
+        let toolbar_action = self.toolbar_handler.handle_input(_cx);
         self.handle_toolbar_action(toolbar_action);
 
         // Update navigation state from current state
@@ -295,8 +319,8 @@ impl eframe::App for DiffViewerApp {
             current_state.connector_curves.len(),
         );
 
-        // Update viewport height dynamically
-        let viewport_height = ctx.screen_rect().height();
+        // Update viewport height dynamically (simplified for now)
+        let viewport_height = 1000.0; // Fixed height for now
         self.scroll_sync.update_viewport_height(viewport_height);
 
         // Update state with current scroll positions
@@ -306,36 +330,57 @@ impl eframe::App for DiffViewerApp {
             state.update_scroll_offsets(left_scroll, right_scroll);
             state.set_viewport_height(viewport_height);
         });
+    }
 
-        egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(self.theme.background))
-            .show(ctx, |ui| {
-                ui.vertical(|ui| {
-                    // Render toolbar
-                    let toolbar_button_action = self.toolbar_handler.render_toolbar(ui);
-                    self.handle_toolbar_action(toolbar_button_action);
+    pub fn view(&self) -> gpui::AnyElement {
+        // Render the main layout using GPUI elements
+        div()
+            .h_full()
+            .w_full()
+            .flex()
+            .flex_col()
+            .child(self.render_toolbar())
+            .child(div().h(px(1.0)).bg(rgb(0x3c3c3c)))
+            .child(self.render_main_content())
+            .into_any_element()
+    }
 
-                    ui.separator();
+    fn render_toolbar(&self) -> gpui::AnyElement {
+        // Simplified toolbar rendering
+        div()
+            .h(px(30.0))
+            .w_full()
+            .bg(rgb(0x2d2d30))
+            .flex()
+            .flex_row()
+            .items_center()
+            .child(div().px(px(16.0)).child("JetBrains Diff Viewer - GPUI"))
+            .into_any_element()
+    }
 
-                    let current_state = self.state_manager.get_current_state();
-                    let left_lines = current_state.left_lines.clone();
-                    let right_lines = current_state.right_lines.clone();
-                    let mapping_segments = current_state.mapping_segments.clone();
-                    let imara_analysis = current_state.imara_analysis.clone();
+    fn render_main_content(&self) -> gpui::AnyElement {
+        let current_state = self.state_manager.get_current_state();
+        let left_lines = current_state.left_lines.clone();
+        let right_lines = current_state.right_lines.clone();
+        let mapping_segments = current_state.mapping_segments.clone();
+        let imara_analysis = current_state.imara_analysis.clone();
 
-                    // Use the proper layout manager with improved connector rendering
-                    self.layout_manager.render_layout(
-                        ui,
-                        &left_lines,
-                        &right_lines,
-                        &mut self.scroll_sync,
-                        &self.theme,
-                        &mut self.line_renderer,
-                        &mut self.connector_renderer,
-                        &mapping_segments,
-                        &imara_analysis,
-                    );
-                });
-            });
+        // Use the proper layout manager with improved connector rendering
+        div()
+            .flex_1()
+            .h_full() // Ensure container gets full height for proper layout
+            .child(self.layout_manager.render_layout(
+                &left_lines,
+                &right_lines,
+                &mut self.scroll_sync.clone(),
+                &self.theme,
+                &mut self.line_renderer.clone(),
+                mapping_segments.as_slice(),
+                &imara_analysis,
+                current_state.viewport_height,
+                current_state.left_scroll_offset,
+                current_state.right_scroll_offset,
+            ))
+            .into_any_element()
     }
 }
