@@ -111,7 +111,7 @@ pub mod math_utils {
 
 /// Geometry utilities for UI calculations
 pub mod geometry_utils {
-    use egui::Pos2;
+    use crate::compat::Pos2;
 
     /// Calculate the center point between two positions
     pub fn center(a: Pos2, b: Pos2) -> Pos2 {

@@ -1,7 +1,7 @@
 // jetbrains_diff_step_by_step2/src/toolbar.rs
 // Toolbar navigation module for diff viewer
 
-use eframe::egui;
+// GPUI migration: eframe not needed
 use std::path::PathBuf;
 
 /// Diff mode for navigation

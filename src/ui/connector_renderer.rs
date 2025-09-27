@@ -1,5 +1,5 @@
 // Connector rendering logic for diff viewer
-use egui::{Color32, Pos2, Rect};
+use crate::compat::{Color32, Pos2, Rect};
 
 use crate::models::line::LineType;
 use crate::theme::JetBrainsTheme;

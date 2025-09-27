@@ -1,8 +1,8 @@
 // src/ui/layout/gutter.rs
 // Gutter rendering logic extracted from layout/mod.rs
 
-use eframe::egui;
-use egui::Vec2;
+// GPUI migration: eframe not needed
+use crate::compat::{Align, Color32, Layout, Pos2, Sense, Shape, Stroke, Vec2};
 use crate::config::LayoutConfig;
 use crate::models::line::DisplayLine;
 
@@ -32,13 +32,13 @@ impl GutterRenderer {
         {
             ui.allocate_ui_with_layout(
                 Vec2::new(self.config.connector_column_width, total_height),
-                egui::Layout::top_down(egui::Align::Center),
+                Layout::top_down(Align::Center),
                 |ui| {
                     // Ensure the full height is used and background is filled
                     let _full_rect = ui
                         .allocate_response(
                             Vec2::new(self.config.connector_column_width, total_height),
-                            egui::Sense::hover(),
+                            Sense::hover(),
                         )
                         .rect;
 
@@ -103,28 +103,28 @@ impl GutterRenderer {
 
                         // Use a simple polygon for the connector
                         let points = vec![
-                            egui::Pos2::new(connector_start_x, left_start_y),
-                            egui::Pos2::new(connector_start_x, left_end_y),
-                            egui::Pos2::new(connector_end_x, right_end_y),
-                            egui::Pos2::new(connector_end_x, right_start_y),
+                            Pos2::new(connector_start_x, left_start_y),
+                            Pos2::new(connector_start_x, left_end_y),
+                            Pos2::new(connector_end_x, right_end_y),
+                            Pos2::new(connector_end_x, right_start_y),
                         ];
 
                         // Choose color based on change type - use theme colors
                         let connector_color = if left_hunk.0 == left_hunk.1 {
                             // Single line - likely a modification - use modification theme color
                             let base = theme.modification_background;
-                            egui::Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), 80)
+                            Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), 80)
                         } else {
                             // Multi-line - likely addition/deletion - use blue theme color
                             let base = theme.color_blue_500;
-                            egui::Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), 80)
+                            Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), 80)
                         };
 
                         // Draw the filled polygon
-                        ui.painter().add(egui::epaint::Shape::convex_polygon(
+                        ui.painter().add(Shape::convex_polygon(
                             points,
                             connector_color,
-                            egui::Stroke::NONE,
+                            Stroke::NONE,
                         ));
                     }
                 },

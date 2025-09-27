@@ -1,38 +1,35 @@
 // JetBrains theme implementation with Zed IDE font specifications
 use crate::config::{FontMetrics, LineHeightMode, ZedFontConfig, ZedFontManager, ZedSettings};
-use gpui::{Hsla, rgba};
-
-// Compatibility layer for egui types
-pub type Color32 = gpui::Hsla;
+use egui::Color32;
 pub type Stroke = f32; // Simplified for now
 
 #[derive(Debug, Clone)]
 pub struct JetBrainsTheme {
-    pub color_blue_500: Color32,
+    pub color_blue_500: egui::Color32,
     pub font_config: ZedFontConfig,
     pub editor_settings: ZedSettings,
     pub gutter_width: f32,
     pub connector_width: f32,
-    pub addition_background: Color32,
-    pub addition_foreground: Color32,
-    pub addition_gutter: Color32,
-    pub deletion_background: Color32,
-    pub deletion_foreground: Color32,
-    pub deletion_gutter: Color32,
-    pub modification_background: Color32,
-    pub modification_foreground: Color32,
-    pub modification_gutter: Color32,
-    pub code_foreground: Color32,
-    pub code_comment: Color32,
-    pub code_keyword: Color32,
-    pub code_string: Color32,
-    pub background: Color32,
-    pub foreground: Color32,
-    pub border: Color32,
-    pub gutter_background: Color32,
-    pub gutter_border: Color32,
-    pub connector_column: Color32,
-    pub line_numbers: Color32,
+    pub addition_background: egui::Color32,
+    pub addition_foreground: egui::Color32,
+    pub addition_gutter: egui::Color32,
+    pub deletion_background: egui::Color32,
+    pub deletion_foreground: egui::Color32,
+    pub deletion_gutter: egui::Color32,
+    pub modification_background: egui::Color32,
+    pub modification_foreground: egui::Color32,
+    pub modification_gutter: egui::Color32,
+    pub code_foreground: egui::Color32,
+    pub code_comment: egui::Color32,
+    pub code_keyword: egui::Color32,
+    pub code_string: egui::Color32,
+    pub background: egui::Color32,
+    pub foreground: egui::Color32,
+    pub border: egui::Color32,
+    pub gutter_background: egui::Color32,
+    pub gutter_border: egui::Color32,
+    pub connector_column: egui::Color32,
+    pub line_numbers: egui::Color32,
     pub show_line_numbers: bool,
 }
 
@@ -43,45 +40,45 @@ impl JetBrainsTheme {
         let editor_settings = ZedSettings::default();
 
         Self {
-            color_blue_500: rgba(33.0/255.0, 150.0/255.0, 243.0/255.0, 1.0),
+            color_blue_500: egui::Color32::from_rgb(33, 150, 243),
             font_config,
             editor_settings,
             gutter_width: 45.0,
             connector_width: 45.0,
-            addition_background: rgba(52.0/255.0, 85.0/255.0, 52.0/255.0, 1.0),
-            addition_foreground: rgba(129.0/255.0, 199.0/255.0, 132.0/255.0, 1.0),
-            addition_gutter: rgba(52.0/255.0, 85.0/255.0, 52.0/255.0, 1.0),
-            deletion_background: rgba(85.0/255.0, 56.0/255.0, 56.0/255.0, 1.0), // Rouge foncé solide (pas de transparence)
-            deletion_foreground: rgba(239.0/255.0, 154.0/255.0, 154.0/255.0, 1.0),
-            deletion_gutter: rgba(113.0/255.0, 113.0/255.0, 113.0/255.0, 1.0),
-            modification_background: rgba(50.0/255.0, 66.0/255.0, 98.0/255.0, 1.0),
-            modification_foreground: rgba(212.0/255.0, 212.0/255.0, 212.0/255.0, 1.0), // Use normal foreground for modifications
-            modification_gutter: rgba(50.0/255.0, 66.0/255.0, 98.0/255.0, 1.0),
-            code_foreground: rgba(212.0/255.0, 212.0/255.0, 212.0/255.0, 1.0),
-            code_comment: rgba(106.0/255.0, 153.0/255.0, 85.0/255.0, 1.0),
-            code_keyword: rgba(86.0/255.0, 156.0/255.0, 214.0/255.0, 1.0),
-            code_string: rgba(206.0/255.0, 145.0/255.0, 120.0/255.0, 1.0),
-            background: rgba(30.0/255.0, 30.0/255.0, 30.0/255.0, 1.0),
-            foreground: rgba(212.0/255.0, 212.0/255.0, 212.0/255.0, 1.0),
-            border: rgba(62.0/255.0, 62.0/255.0, 62.0/255.0, 1.0),
-            gutter_background: rgba(37.0/255.0, 37.0/255.0, 38.0/255.0, 1.0),
-            gutter_border: rgba(62.0/255.0, 62.0/255.0, 62.0/255.0, 1.0),
-            connector_column: rgba(45.0/255.0, 45.0/255.0, 45.0/255.0, 1.0),
-            line_numbers: rgba(153.0/255.0, 153.0/255.0, 153.0/255.0, 1.0),
+            addition_background: egui::Color32::from_rgb(52, 85, 52),
+            addition_foreground: egui::Color32::from_rgb(129, 199, 132),
+            addition_gutter: egui::Color32::from_rgb(76, 175, 80),
+            deletion_background: egui::Color32::from_rgb(85, 52, 52),
+            deletion_foreground: egui::Color32::from_rgb(199, 129, 129),
+            deletion_gutter: egui::Color32::from_rgb(244, 67, 54),
+            modification_background: egui::Color32::from_rgb(52, 52, 85),
+            modification_foreground: egui::Color32::from_rgb(129, 129, 199),
+            modification_gutter: egui::Color32::from_rgb(33, 150, 243),
+            code_foreground: egui::Color32::from_rgb(169, 183, 198),
+            code_comment: egui::Color32::from_rgb(128, 128, 128),
+            code_keyword: egui::Color32::from_rgb(204, 120, 50),
+            code_string: egui::Color32::from_rgb(106, 135, 89),
+            background: egui::Color32::from_rgb(43, 43, 43),
+            foreground: egui::Color32::from_rgb(169, 183, 198),
+            border: egui::Color32::from_rgb(73, 73, 73),
+            gutter_background: egui::Color32::from_rgb(33, 33, 33),
+            gutter_border: egui::Color32::from_rgb(73, 73, 73),
+            connector_column: egui::Color32::from_rgb(43, 43, 43),
+            line_numbers: egui::Color32::from_rgb(128, 128, 128),
             show_line_numbers: true,
         }
     }
 
     // TODO: Migrate to gpui context
     // pub fn apply_to_context(&self, ctx: &egui::Context) {
-        // TODO: Apply gpui font configuration
-        // let font_manager = ZedFontManager::with_config(self.font_config.clone());
-        // font_manager.apply_to_context(ctx);
-        // 
-        // let mut style = (*ctx.style()).clone();
-        // style.visuals.dark_mode = self.background.r() < 128;
-        // ...
-        // ctx.set_style(style);
+    // TODO: Apply gpui font configuration
+    // let font_manager = ZedFontManager::with_config(self.font_config.clone());
+    // font_manager.apply_to_context(ctx);
+    //
+    // let mut style = (*ctx.style()).clone();
+    // style.visuals.dark_mode = self.background.r() < 128;
+    // ...
+    // ctx.set_style(style);
     // }
 
     /// Get Zed-style buffer font size
@@ -173,7 +170,7 @@ impl JetBrainsTheme {
             crate::models::line::LineType::Addition => self.addition_background,
             crate::models::line::LineType::Deletion => self.deletion_background,
             crate::models::line::LineType::Modification => self.modification_background,
-            crate::models::line::LineType::Context => rgba(0.0, 0.0, 0.0, 0.0),
+            crate::models::line::LineType::Context => egui::Color32::TRANSPARENT,
         }
     }
 
@@ -198,31 +195,31 @@ impl JetBrainsTheme {
         let editor_settings = ZedSettings::default();
 
         Self {
-            color_blue_500: rgba(100.0/255.0, 150.0/255.0, 200.0/255.0, 1.0),
+            color_blue_500: egui::Color32::from_rgb(100, 150, 200),
             font_config,
             editor_settings,
             gutter_width: 40.0,
             connector_width: 40.0,
-            addition_background: rgba(40.0/255.0, 60.0/255.0, 40.0/255.0, 1.0),
-            addition_foreground: rgba(100.0/255.0, 180.0/255.0, 100.0/255.0, 1.0),
-            addition_gutter: rgba(40.0/255.0, 60.0/255.0, 40.0/255.0, 1.0),
-            deletion_background: rgba(80.0/255.0, 50.0/255.0, 50.0/255.0, 1.0), // Rouge plus visible
-            deletion_foreground: rgba(200.0/255.0, 120.0/255.0, 120.0/255.0, 1.0),
-            deletion_gutter: rgba(80.0/255.0, 80.0/255.0, 80.0/255.0, 1.0),
-            modification_background: rgba(40.0/255.0, 50.0/255.0, 80.0/255.0, 1.0),
-            modification_foreground: rgba(200.0/255.0, 200.0/255.0, 200.0/255.0, 1.0), // Use normal foreground for modifications
-            modification_gutter: rgba(40.0/255.0, 50.0/255.0, 80.0/255.0, 1.0),
-            code_foreground: rgba(200.0/255.0, 200.0/255.0, 200.0/255.0, 1.0),
-            code_comment: rgba(100.0/255.0, 140.0/255.0, 80.0/255.0, 1.0),
-            code_keyword: rgba(80.0/255.0, 140.0/255.0, 200.0/255.0, 1.0),
-            code_string: rgba(200.0/255.0, 140.0/255.0, 100.0/255.0, 1.0),
-            background: rgba(40.0/255.0, 40.0/255.0, 40.0/255.0, 1.0),
-            foreground: rgba(200.0/255.0, 200.0/255.0, 200.0/255.0, 1.0),
-            border: rgba(80.0/255.0, 80.0/255.0, 80.0/255.0, 1.0),
-            gutter_background: rgba(50.0/255.0, 50.0/255.0, 50.0/255.0, 1.0),
-            gutter_border: rgba(80.0/255.0, 80.0/255.0, 80.0/255.0, 1.0),
-            connector_column: rgba(60.0/255.0, 60.0/255.0, 60.0/255.0, 1.0),
-            line_numbers: rgba(140.0/255.0, 140.0/255.0, 140.0/255.0, 1.0),
+            addition_background: egui::Color32::from_rgb(40, 60, 40),
+            addition_foreground: egui::Color32::from_rgb(100, 180, 100),
+            addition_gutter: egui::Color32::from_rgb(76, 175, 80),
+            deletion_background: egui::Color32::from_rgb(80, 50, 50),
+            deletion_foreground: egui::Color32::from_rgb(200, 120, 120),
+            deletion_gutter: egui::Color32::from_rgb(244, 67, 54),
+            modification_background: egui::Color32::from_rgb(40, 50, 80),
+            modification_foreground: egui::Color32::from_rgb(200, 200, 200),
+            modification_gutter: egui::Color32::from_rgb(33, 150, 243),
+            code_foreground: egui::Color32::from_rgb(0, 0, 0),
+            code_comment: egui::Color32::from_rgb(128, 128, 128),
+            code_keyword: egui::Color32::from_rgb(0, 0, 255),
+            code_string: egui::Color32::from_rgb(0, 128, 0),
+            background: egui::Color32::from_rgb(255, 255, 255),
+            foreground: egui::Color32::from_rgb(0, 0, 0),
+            border: egui::Color32::from_rgb(200, 200, 200),
+            gutter_background: egui::Color32::from_rgb(240, 240, 240),
+            gutter_border: egui::Color32::from_rgb(200, 200, 200),
+            connector_column: egui::Color32::from_rgb(240, 240, 240),
+            line_numbers: egui::Color32::from_rgb(128, 128, 128),
             show_line_numbers: true,
         }
     }

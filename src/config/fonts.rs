@@ -1,5 +1,5 @@
 // Font configuration system based on Zed IDE specifications from crates/theme/src/settings.rs
-use egui::{FontData, FontDefinitions, FontFamily, FontId};
+use crate::compat::{FontData, FontDefinitions, FontFamily, FontId};
 use std::result::Result;
 
 /// Zed IDE font specifications from source code
@@ -183,22 +183,22 @@ impl ZedFontManager {
         // Set default font sizes with safe fallbacks
         style.text_styles.insert(
             egui::TextStyle::Body,
-            FontId::new(self.config.ui_font_size, FontFamily::Proportional),
+            egui::FontId::new(self.config.ui_font_size, egui::FontFamily::Proportional),
         );
         style.text_styles.insert(
             egui::TextStyle::Monospace,
-            FontId::new(self.config.buffer_font_size, FontFamily::Monospace),
+            egui::FontId::new(self.config.buffer_font_size, egui::FontFamily::Monospace),
         );
         style.text_styles.insert(
-            egui::TextStyle::Button,
+            crate::compat::TextStyle::Button,
             FontId::new(self.config.ui_font_size, FontFamily::Proportional),
         );
         style.text_styles.insert(
-            egui::TextStyle::Small,
+            crate::compat::TextStyle::Small,
             FontId::new(self.config.ui_font_size * 0.85, FontFamily::Proportional),
         );
         style.text_styles.insert(
-            egui::TextStyle::Heading,
+            crate::compat::TextStyle::Heading,
             FontId::new(self.config.ui_font_size * 1.2, FontFamily::Proportional),
         );
 
@@ -291,7 +291,7 @@ impl ZedFontManager {
             Ok(lilex_data) => {
                 font_definitions
                     .font_data
-                    .insert("Lilex".to_owned(), FontData::from_static(lilex_data).into());
+                    .insert("Lilex".to_owned(), egui::FontData::from_static(lilex_data));
                 fonts_loaded += 1;
             }
             Err(_) => {}
@@ -303,7 +303,7 @@ impl ZedFontManager {
             Ok(plex_sans_data) => {
                 font_definitions.font_data.insert(
                     "IBM Plex Sans".to_owned(),
-                    FontData::from_static(plex_sans_data).into(),
+                    egui::FontData::from_static(plex_sans_data),
                 );
                 fonts_loaded += 1;
             }

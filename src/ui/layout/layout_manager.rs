@@ -6,8 +6,8 @@ use crate::config::LayoutConfig;
 use crate::models::diff::MappingSegment;
 use crate::models::line::DisplayLine;
 use crate::ui::ConnectorRenderer;
-use eframe::egui;
-use egui::{Pos2, Rect, Vec2};
+// GPUI migration: eframe not needed
+use crate::compat::{Align, Color32, Layout, Pos2, Rect, Sense, Shape, Vec2};
 
 /// Layout manager for the diff viewer
 pub struct LayoutManager {
@@ -363,7 +363,7 @@ impl LayoutManager {
         y2_end: f32,
         color: egui::Color32,
     ) {
-        use egui::{epaint::Mesh, epaint::Vertex, Pos2};
+        use crate::compat::{Mesh, Pos2, Vertex};
 
         let segments = 32; // Use high resolution for a perfectly smooth curve.
         let mut top_points = Vec::with_capacity(segments + 1);

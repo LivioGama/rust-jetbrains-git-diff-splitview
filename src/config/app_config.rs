@@ -1,30 +1,44 @@
 // src/config/app_config.rs
 // Application configuration extracted from main.rs
 
-use eframe::egui;
+// GPUI migration: eframe not needed
+
+use gpui::{
+    Bounds, Pixels, Point, Size, TitlebarOptions, WindowBackgroundAppearance, WindowBounds,
+    WindowDecorations, WindowKind, WindowOptions,
+};
 
 /// Application configuration for window and runtime settings
 pub struct WindowConfig;
 
 impl WindowConfig {
-    /// Get eframe native options for window setup (extracted from main.rs lines 53-65)
-    pub fn get_window_options() -> eframe::NativeOptions {
-        eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_inner_size([1600.0, 1000.0])
-                .with_resizable(true)
-                .with_visible(true)
-                .with_transparent(false)
-                .with_decorations(cfg!(not(any(
-                    target_os = "ios",
-                    target_os = "android",
-                    target_arch = "wasm32"
-                ))))
-                .with_window_level(egui::WindowLevel::Normal),
-            centered: true,
-            // Add hardware acceleration settings for better compatibility
-            hardware_acceleration: eframe::HardwareAcceleration::Preferred,
-            ..Default::default()
+    /// Get GPUI window options for window setup
+    pub fn get_window_options() -> WindowOptions {
+        WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(Bounds {
+                origin: Point {
+                    x: Pixels(0.0),
+                    y: Pixels(0.0),
+                },
+                size: Size {
+                    width: Pixels(1600.0),
+                    height: Pixels(1000.0),
+                },
+            })),
+            titlebar: Some(TitlebarOptions {
+                title: Some("JetBrains Diff Viewer".into()),
+                appears_transparent: false,
+                traffic_light_position: None,
+            }),
+            window_background: WindowBackgroundAppearance::Opaque,
+            focus: true,
+            show: true,
+            kind: WindowKind::Normal,
+            is_movable: true,
+            display_id: None,
+            window_min_size: None,
+            app_id: None,
+            window_decorations: Some(WindowDecorations::Server),
         }
     }
 

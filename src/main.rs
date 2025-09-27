@@ -2,7 +2,7 @@
 // Main entry point for the JetBrains Diff Viewer
 // Clean, modular architecture with separated concerns
 
-use gpui::{App, AppContext, WindowOptions, WindowBounds, Pixels};
+use gpui::{App, AppContext, Pixels, WindowBounds, WindowOptions};
 
 // Module declarations
 mod actions;
@@ -25,10 +25,10 @@ mod ui;
 mod utils;
 
 use app::DiffViewerApp;
+use core::app_bootstrap::AppBootstrap;
+use config::WindowConfig;
 
 fn main() {
-    println!("🚀 Starting JetBrains Diff Viewer - Modular Edition (GPUI)");
-
     // Set up panic handler for better error reporting
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("💥 Application panicked: {}", panic_info);
@@ -42,43 +42,10 @@ fn main() {
         }
     }));
 
-    App::new().run(|cx: &mut AppContext| {
-        let window_options = WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(gpui::Bounds {
-                origin: gpui::Point { 
-                    x: Pixels(0.0), 
-                    y: Pixels(0.0) 
-                },
-                size: gpui::Size {
-                    width: Pixels(1600.0),
-                    height: Pixels(1000.0),
-                },
-            })),
-            titlebar: Some(gpui::TitlebarOptions {
-                title: Some("JetBrains Diff Viewer - Modular".into()),
-                appears_transparent: false,
-                traffic_light_position: None,
-            }),
-            window_background: gpui::WindowBackgroundAppearance::Opaque,
-            focus: true,
-            show: true,
-            kind: gpui::WindowKind::Normal,
-            is_movable: true,
-            is_resizable: true,
-            is_minimizable: true,
-            display_id: None,
-            window_min_size: None,
-            app_id: None,
-            tabbing_identifier: None,
-            window_decorations: Some(gpui::WindowDecorations::Server),
-        };
+    let bootstrap = AppBootstrap::initialize().expect("Failed to initialize app");
+    let app = DiffViewerApp::new(bootstrap);
 
-        cx.open_window(window_options, |cx| {
-            let bootstrap = crate::core::app_bootstrap::AppBootstrap::initialize()
-                .expect("Failed to initialize application");
-            
-            DiffViewerApp::new(bootstrap)
-        })
-        .expect("Failed to create window");
+    App::new().run(move |cx| {
+        cx.open_window(WindowConfig::get_window_options(), |cx| app);
     });
 }

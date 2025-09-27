@@ -5,6 +5,7 @@ use crate::compat::{Color32, FontId, Pos2, Ui, Rect, Vec2};
 use crate::models::line::{DisplayLine, LineType};
 use crate::syntax::SyntaxHighlighter;
 use crate::theme::JetBrainsTheme;
+use egui::Align2;
 
 /// Text renderer for handling complex text rendering operations
 pub struct TextRenderer {
@@ -21,7 +22,13 @@ impl TextRenderer {
     }
 
     /// Render line number with enhanced styling
-    pub fn render_line_number(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: egui::Rect, baseline_y: f32) {
+    pub fn render_line_number(
+        &self,
+        ui: &mut egui::Ui,
+        line: &DisplayLine,
+        rect: egui::Rect,
+        baseline_y: f32,
+    ) {
         if let Some(line_num) = line.original_line_num {
             // Standardized positioning calculation for both panes
             let line_num_pos = Pos2::new(rect.min.x + 30.0, baseline_y);
@@ -37,7 +44,13 @@ impl TextRenderer {
     }
 
     /// Render code content with JetBrains syntax highlighting
-    pub fn render_content(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: egui::Rect, baseline_y: f32) {
+    pub fn render_content(
+        &self,
+        ui: &mut egui::Ui,
+        line: &DisplayLine,
+        rect: egui::Rect,
+        baseline_y: f32,
+    ) {
         if !line.content.is_empty() {
             let content_start_x = self.theme.gutter_width;
 
@@ -73,19 +86,22 @@ impl TextRenderer {
                         LineType::Addition => {
                             // For addition lines, blend syntax color with addition foreground
                             use crate::syntax::colors::JetBrainsColors;
-                            let syntax_color = JetBrainsColors::get_color_for_token(&token.token_type);
+                            let syntax_color =
+                                JetBrainsColors::get_color_for_token(&token.token_type);
                             self.blend_colors(syntax_color, self.theme.addition_foreground, 0.7)
                         }
                         LineType::Deletion => {
                             // For deletion lines, blend syntax color with deletion foreground
                             use crate::syntax::colors::JetBrainsColors;
-                            let syntax_color = JetBrainsColors::get_color_for_token(&token.token_type);
+                            let syntax_color =
+                                JetBrainsColors::get_color_for_token(&token.token_type);
                             self.blend_colors(syntax_color, self.theme.deletion_foreground, 0.7)
                         }
                         LineType::Modification => {
                             // For modification lines, blend syntax color with modification foreground
                             use crate::syntax::colors::JetBrainsColors;
-                            let syntax_color = JetBrainsColors::get_color_for_token(&token.token_type);
+                            let syntax_color =
+                                JetBrainsColors::get_color_for_token(&token.token_type);
                             self.blend_colors(syntax_color, self.theme.modification_foreground, 0.7)
                         }
                         _ => {
@@ -99,7 +115,8 @@ impl TextRenderer {
                     while current_char_idx < token.start {
                         if let Some(ch) = line.content.chars().nth(current_char_idx) {
                             if ch.is_whitespace() {
-                                let space_width = self.theme.char_width() * if ch == '\t' { 4.0 } else { 1.0 };
+                                let space_width =
+                                    self.theme.char_width() * if ch == '\t' { 4.0 } else { 1.0 };
                                 current_x += space_width;
                             }
                         }
@@ -134,7 +151,13 @@ impl TextRenderer {
     }
 
     /// Render word-level highlights for modifications
-    pub fn render_word_highlights(&self, ui: &mut egui::Ui, line: &DisplayLine, rect: egui::Rect, baseline_y: f32) {
+    pub fn render_word_highlights(
+        &self,
+        ui: &mut egui::Ui,
+        line: &DisplayLine,
+        rect: egui::Rect,
+        baseline_y: f32,
+    ) {
         if (line.line_type == LineType::Context || line.line_type == LineType::Modification)
             && !line.word_highlights.is_empty()
         {
@@ -179,13 +202,22 @@ impl TextRenderer {
     }
 
     /// Blend two colors with a given weight (from original line_renderer.rs)
-    fn blend_colors(&self, syntax_color: Color32, line_color: Color32, syntax_weight: f32) -> Color32 {
+    fn blend_colors(
+        &self,
+        syntax_color: Color32,
+        line_color: Color32,
+        syntax_weight: f32,
+    ) -> Color32 {
         let line_weight = 1.0 - syntax_weight;
 
-        let r = (syntax_color.r() as f32 * syntax_weight + line_color.r() as f32 * line_weight) as u8;
-        let g = (syntax_color.g() as f32 * syntax_weight + line_color.g() as f32 * line_weight) as u8;
-        let b = (syntax_color.b() as f32 * syntax_weight + line_color.b() as f32 * line_weight) as u8;
-        let a = (syntax_color.a() as f32 * syntax_weight + line_color.a() as f32 * line_weight) as u8;
+        let r =
+            (syntax_color.r() as f32 * syntax_weight + line_color.r() as f32 * line_weight) as u8;
+        let g =
+            (syntax_color.g() as f32 * syntax_weight + line_color.g() as f32 * line_weight) as u8;
+        let b =
+            (syntax_color.b() as f32 * syntax_weight + line_color.b() as f32 * line_weight) as u8;
+        let a =
+            (syntax_color.a() as f32 * syntax_weight + line_color.a() as f32 * line_weight) as u8;
 
         Color32::from_rgba_unmultiplied(r, g, b, a)
     }

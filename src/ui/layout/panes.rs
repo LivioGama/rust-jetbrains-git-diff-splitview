@@ -4,8 +4,9 @@
 use crate::config::LayoutConfig;
 use crate::models::diff::MappingSegment;
 use crate::models::line::DisplayLine;
-use eframe::egui;
-use egui::{FontId, ScrollArea, Vec2};
+// GPUI migration: eframe not needed
+use crate::compat::{FontId, Vec2};
+use egui::{Align, Color32, FontFamily, Layout, RichText, ScrollArea, Sense};
 
 /// Pane rendering functionality for the layout manager
 pub struct PaneRenderer {
@@ -32,9 +33,9 @@ impl PaneRenderer {
     ) {
         ui.allocate_ui_with_layout(
             Vec2::new(pane_width, total_height),
-            egui::Layout::top_down(egui::Align::LEFT),
+            Layout::top_down(Align::LEFT),
             |ui| {
-                ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
+                ui.style_mut().spacing.item_spacing = Vec2::ZERO;
                 ui.style_mut().spacing.indent = 0.0;
                 // Header
                 self.render_pane_header(ui, "Original", theme);
@@ -74,9 +75,9 @@ impl PaneRenderer {
     ) {
         ui.allocate_ui_with_layout(
             Vec2::new(pane_width, total_height),
-            egui::Layout::top_down(egui::Align::LEFT),
+            Layout::top_down(Align::LEFT),
             |ui| {
-                ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
+                ui.style_mut().spacing.item_spacing = Vec2::ZERO;
                 ui.style_mut().spacing.indent = 0.0;
                 // Header
                 self.render_pane_header(ui, "Modified", theme);
@@ -111,10 +112,10 @@ impl PaneRenderer {
         ui.horizontal(|ui| {
             ui.add_space(self.config.pane_padding);
             ui.label(
-                egui::RichText::new(title)
+                RichText::new(title)
                     .font(FontId::new(
                         theme.ui_font_size() * 1.1,
-                        egui::FontFamily::Proportional,
+                        FontFamily::Proportional,
                     ))
                     .color(theme.foreground),
             );
@@ -140,7 +141,6 @@ impl PaneRenderer {
 
         // Create scroll area for this pane
         let scroll_area = ScrollArea::vertical()
-            .id_salt(scroll_id)
             .auto_shrink([false, false])
             .max_height(available_height)
             .stick_to_bottom(false);
@@ -151,7 +151,7 @@ impl PaneRenderer {
             let mut crushed_rects = Vec::new();
             let mut crushed_line_rects = Vec::new();
 
-            ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
+            ui.style_mut().spacing.item_spacing = Vec2::ZERO;
 
             // Create a combined rendering plan that includes both normal lines and crushed blocks in proper sequence
             let mut line_idx = 0;
@@ -217,21 +217,19 @@ impl PaneRenderer {
                         && !imara_block.left_range.is_empty())
                 {
                     // Allocate space for the crushed block within the UI layout
-                    let (crushed_rect, _response) = ui.allocate_exact_size(
-                        egui::Vec2::new(ui.available_width(), 2.0),
-                        egui::Sense::hover(),
-                    );
+                    let (crushed_rect, _response) = ui
+                        .allocate_exact_size(Vec2::new(ui.available_width(), 2.0), Sense::hover());
 
                     let (color, block_type, block_idx) =
                         if is_left && imara_block.is_pure_insertion() {
                             (
-                                egui::Color32::from_rgba_unmultiplied(76, 175, 80, 128),
+                                Color32::from_rgba_unmultiplied(76, 175, 80, 128),
                                 "addition",
                                 imara_block.right_range.start,
                             )
                         } else {
                             (
-                                egui::Color32::from_rgba_unmultiplied(244, 67, 54, 128),
+                                Color32::from_rgba_unmultiplied(244, 67, 54, 128),
                                 "deletion",
                                 imara_block.left_range.start,
                             )

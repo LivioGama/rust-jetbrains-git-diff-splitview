@@ -1,7 +1,8 @@
 #[allow(dead_code)]
 // diffsplit/src/navigation/mod.rs
 // Keyboard navigation module for diff viewer
-use eframe::egui;
+// GPUI migration: eframe not needed
+use crate::compat::{InputState, Key};
 
 /// Navigation actions that can be performed
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -38,24 +39,24 @@ impl NavigationHandler {
     }
 
     /// Handle keyboard input and return the appropriate navigation action
-    pub fn handle_input(&mut self, ctx: &egui::Context) -> NavigationAction {
-        if ctx.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
+    pub fn handle_input(&mut self, input: &InputState) -> NavigationAction {
+        if input.key_pressed(Key::ArrowDown) {
             self.navigate_to_next_diff_block();
             NavigationAction::NextDiffBlock
-        } else if ctx.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
+        } else if input.key_pressed(Key::ArrowUp) {
             self.navigate_to_previous_diff_block();
             NavigationAction::PreviousDiffBlock
-        } else if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
+        } else if input.key_pressed(Key::ArrowRight) {
             self.navigate_to_next_connector();
             NavigationAction::NextConnector
-        } else if ctx.input(|i| i.key_pressed(egui::Key::ArrowLeft)) {
+        } else if input.key_pressed(Key::ArrowLeft) {
             self.navigate_to_previous_connector();
             NavigationAction::PreviousConnector
-        } else if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
+        } else if input.key_pressed(Key::Enter) {
             NavigationAction::ApplyHunk
-        } else if ctx.input(|i| i.key_pressed(egui::Key::Backspace)) {
+        } else if input.key_pressed(Key::Backspace) {
             NavigationAction::RevertHunk
-        } else if ctx.input(|i| i.key_pressed(egui::Key::Space)) {
+        } else if input.key_pressed(Key::Space) {
             NavigationAction::StageHunk
         } else {
             NavigationAction::None
