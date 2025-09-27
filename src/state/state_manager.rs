@@ -1,5 +1,6 @@
 // src/state/state_manager.rs
 // State manager extracted from state/mod.rs
+#![allow(dead_code)]
 
 use crate::state::app_state::AppState;
 

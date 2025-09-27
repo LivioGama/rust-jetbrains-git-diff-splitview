@@ -1,5 +1,6 @@
 // src/state/app_state.rs
 // Application state structure extracted from state/mod.rs
+#![allow(dead_code)]
 
 use crate::models::*;
 use crate::navigation::NavigationState;

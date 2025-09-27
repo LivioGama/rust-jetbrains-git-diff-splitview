@@ -1,4 +1,6 @@
 // Scroll synchronization for diff viewer panes
+#![allow(dead_code)]
+
 use crate::models::diff::{AnchorPoint, ChangeBlock, MappingSegment};
 
 #[derive(Debug, Clone, Copy, PartialEq)]

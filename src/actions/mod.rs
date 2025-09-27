@@ -35,13 +35,13 @@ impl ActionHandler {
     fn apply_hunk(&self, block_index: usize) -> ActionResult {
         // Implementation: Apply changes from right side to left side
         eprintln!("🔨 Applying hunk at block index {}", block_index);
-        
+
         // In a real implementation, this would:
         // 1. Get the current change block
         // 2. Extract the changes from the right side
         // 3. Apply them to the left side content
         // 4. Update the file system or buffer
-        
+
         ActionResult {
             success: true,
             message: format!("✅ Successfully applied hunk at block {}", block_index),
@@ -52,13 +52,13 @@ impl ActionHandler {
     fn revert_hunk(&self, block_index: usize) -> ActionResult {
         // Implementation: Revert changes to original state
         eprintln!("🔄 Reverting hunk at block index {}", block_index);
-        
+
         // In a real implementation, this would:
         // 1. Get the original state from Git or backup
         // 2. Restore the original content for this block
         // 3. Update the diff display
         // 4. Mark the block as reverted
-        
+
         ActionResult {
             success: true,
             message: format!("✅ Successfully reverted hunk at block {}", block_index),
@@ -69,13 +69,13 @@ impl ActionHandler {
     fn stage_hunk(&self, block_index: usize) -> ActionResult {
         // Implementation: Stage changes for Git commit
         eprintln!("📦 Staging hunk at block index {}", block_index);
-        
+
         // In a real implementation, this would:
         // 1. Generate a patch for the specific hunk
         // 2. Use git apply --index to stage the changes
         // 3. Update the staging area without affecting working directory
         // 4. Refresh the diff display to show staged state
-        
+
         ActionResult {
             success: true,
             message: format!("✅ Successfully staged hunk at block {}", block_index),

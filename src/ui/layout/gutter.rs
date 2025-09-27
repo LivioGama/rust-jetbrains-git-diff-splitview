@@ -109,15 +109,54 @@ impl GutterRenderer {
                             egui::Pos2::new(connector_end_x, right_start_y),
                         ];
 
-                        // Choose color based on change type - use theme colors
-                        let connector_color = if left_hunk.0 == left_hunk.1 {
-                            // Single line - likely a modification - use modification theme color
-                            let base = theme.modification_background;
-                            egui::Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), 80)
-                        } else {
-                            // Multi-line - likely addition/deletion - use blue theme color
-                            let base = theme.color_blue_500;
-                            egui::Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), 80)
+                        let sample_left = old_lines
+                            .get(left_hunk.0)
+                            .map(|line| line.line_type.clone());
+                        let sample_right = new_lines
+                            .get(right_hunk.0)
+                            .map(|line| line.line_type.clone());
+
+                        let connector_color = match (sample_left, sample_right) {
+                            (_, Some(crate::models::line::LineType::Addition))
+                            | (Some(crate::models::line::LineType::Addition), _)
+                            | (None, Some(crate::models::line::LineType::Addition)) => {
+                                let base = theme.addition_background;
+                                egui::Color32::from_rgba_unmultiplied(
+                                    base.r(),
+                                    base.g(),
+                                    base.b(),
+                                    base.a(),
+                                )
+                            }
+                            (Some(crate::models::line::LineType::Deletion), _)
+                            | (_, Some(crate::models::line::LineType::Deletion)) => {
+                                let base = theme.deletion_background;
+                                egui::Color32::from_rgba_unmultiplied(
+                                    base.r(),
+                                    base.g(),
+                                    base.b(),
+                                    base.a(),
+                                )
+                            }
+                            (Some(crate::models::line::LineType::Modification), _)
+                            | (_, Some(crate::models::line::LineType::Modification)) => {
+                                let base = theme.modification_background;
+                                egui::Color32::from_rgba_unmultiplied(
+                                    base.r(),
+                                    base.g(),
+                                    base.b(),
+                                    base.a(),
+                                )
+                            }
+                            _ => {
+                                let base = theme.modification_background;
+                                egui::Color32::from_rgba_unmultiplied(
+                                    base.r(),
+                                    base.g(),
+                                    base.b(),
+                                    base.a(),
+                                )
+                            }
                         };
 
                         // Draw the filled polygon

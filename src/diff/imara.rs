@@ -1,4 +1,5 @@
-#[allow(dead_code)]
+#![allow(dead_code)]
+
 use imara_diff::{Algorithm, Diff, InternedInput};
 use std::ops::Range;
 

@@ -181,23 +181,22 @@ impl LayoutManager {
                                 (right_rects.get(right_start), right_rects.get(right_end))
                             {
                                 // Connect from the actual crushed line position to the right block
-                                let left_x_end = gutter_x_start;
                                 let crushed_line_y = crushed_rect.min.y;
-                                let right_x_start = right_start_rect.min.x;
                                 let right_top_y = right_start_rect.top();
                                 let right_bottom_y = right_end_rect.bottom();
 
-                                // Use green color for additions with transparency
+                                // Use the same palette color as addition blocks
+                                let base = theme.addition_background;
                                 let addition_color =
-                                    egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64);
+                                    egui::Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), base.a());
 
                                 // Draw connector from the crushed line to the actual right block
                                 self.draw_connector(
                                     ui,
-                                    left_x_end,
+                                    gutter_x_start,
+                                    self.config.connector_column_width,
                                     crushed_line_y,
                                     crushed_line_y + 2.0,
-                                    right_x_start,
                                     right_top_y,
                                     right_bottom_y,
                                     addition_color,
@@ -223,69 +222,21 @@ impl LayoutManager {
                                 (left_rects.get(left_start), left_rects.get(left_end))
                             {
                                 // Connect from the left block to the actual crushed line position
-                                let left_x_end = left_start_rect.max.x;
                                 let left_top_y = left_start_rect.top();
                                 let left_bottom_y = left_end_rect.bottom();
-
-                                let right_x_start =
-                                    gutter_x_start + self.config.connector_column_width;
                                 let crushed_line_y = crushed_rect.min.y;
 
-                                // Use red color for deletions with transparency
+                                let base = theme.deletion_background;
                                 let deletion_color =
-                                    egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64);
+                                    egui::Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), base.a());
 
                                 // Draw connector from the left block to the crushed line
                                 self.draw_connector(
                                     ui,
-                                    left_x_end,
+                                    gutter_x_start,
+                                    self.config.connector_column_width,
                                     left_top_y,
                                     left_bottom_y,
-                                    right_x_start,
-                                    crushed_line_y,
-                                    crushed_line_y + 2.0,
-                                    deletion_color,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Handle pure deletion blocks - connect to actual crushed lines in right pane
-            if let Some(right_crushed) = &right_crushed_rects {
-                for imara_block in &imara_analysis.blocks {
-                    if imara_block.is_pure_deletion() && !imara_block.left_range.is_empty() {
-                        let left_start = imara_block.left_range.start;
-                        let left_end = imara_block.left_range.end.saturating_sub(1);
-
-                        // Find corresponding crushed line
-                        if let Some((_, crushed_rect, _)) =
-                            right_crushed.iter().find(|(idx, _, _)| *idx == left_start)
-                        {
-                            if let (Some(left_start_rect), Some(left_end_rect)) =
-                                (left_rects.get(left_start), left_rects.get(left_end))
-                            {
-                                // Connect from the left block to the actual crushed line position
-                                let left_x_end = left_start_rect.max.x;
-                                let left_top_y = left_start_rect.top();
-                                let left_bottom_y = left_end_rect.bottom();
-
-                                let right_x_start =
-                                    gutter_x_start + self.config.connector_column_width;
-                                let crushed_line_y = crushed_rect.min.y;
-
-                                // Use red color for deletions with transparency
-                                let deletion_color =
-                                    egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64);
-
-                                // Draw connector from the left block to the crushed line
-                                self.draw_connector(
-                                    ui,
-                                    left_x_end,
-                                    left_top_y,
-                                    left_bottom_y,
-                                    right_x_start,
                                     crushed_line_y,
                                     crushed_line_y + 2.0,
                                     deletion_color,
@@ -315,33 +266,44 @@ impl LayoutManager {
                     let right_y_start = right_start_rect.top();
                     let right_y_end = right_end_rect.bottom();
 
-                    // Clean connector coordinates - use actual content boundaries for seamless connection
-                    let x1 = left_start_rect.max.x; // Exact right edge of left content
-                    let x2 = right_start_rect.min.x; // Exact left edge of right content
-
                     // Determine color based on Imara block operation (prioritize over line types)
                     let color = match operation {
                         crate::diff::imara::ImaraBlockOperation::Modify => {
-                            // All Modify blocks should be blue
-                            egui::Color32::from_rgba_unmultiplied(33, 150, 243, 64)
+                            let base = theme.modification_background;
+                            egui::Color32::from_rgba_unmultiplied(
+                                base.r(),
+                                base.g(),
+                                base.b(),
+                                base.a(),
+                            )
                         }
                         crate::diff::imara::ImaraBlockOperation::Insert => {
-                            // Addition: green
-                            egui::Color32::from_rgba_unmultiplied(76, 175, 80, 64)
+                            let base = theme.addition_background;
+                            egui::Color32::from_rgba_unmultiplied(
+                                base.r(),
+                                base.g(),
+                                base.b(),
+                                base.a(),
+                            )
                         }
                         crate::diff::imara::ImaraBlockOperation::Delete => {
-                            // Deletion: red
-                            egui::Color32::from_rgba_unmultiplied(244, 67, 54, 64)
+                            let base = theme.deletion_background;
+                            egui::Color32::from_rgba_unmultiplied(
+                                base.r(),
+                                base.g(),
+                                base.b(),
+                                base.a(),
+                            )
                         }
                     };
 
-                    // Draw connector between the two blocks
+                    // Draw connector between the two blocks using the middle gutter span
                     self.draw_connector(
                         ui,
-                        x1,
+                        gutter_x_start,
+                        self.config.connector_column_width,
                         left_y_start,
                         left_y_end,
-                        x2,
                         right_y_start,
                         right_y_end,
                         color,
@@ -351,14 +313,14 @@ impl LayoutManager {
         }
     }
 
-    /// Draw connector (restored from original working version)
+    /// Draw connector using an S-shaped ribbon confined to the connector gutter
     fn draw_connector(
         &self,
         ui: &mut egui::Ui,
-        x1: f32,
+        gutter_x_start: f32,
+        gutter_width: f32,
         y1_start: f32,
         y1_end: f32,
-        x2: f32,
         y2_start: f32,
         y2_end: f32,
         color: egui::Color32,
@@ -369,7 +331,11 @@ impl LayoutManager {
         let mut top_points = Vec::with_capacity(segments + 1);
         let mut bottom_points = Vec::with_capacity(segments + 1);
 
-        let control_point_offset = (x2 - x1) * 0.35;
+        let x1 = gutter_x_start;
+        let x2 = gutter_x_start + gutter_width;
+
+        // Match JetBrains curvature by using 30% of the gutter width as control offset
+        let control_point_offset = gutter_width * 0.30;
 
         // 1. Generate the points for the top and bottom curves.
         for i in 0..=segments {

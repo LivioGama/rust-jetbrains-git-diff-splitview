@@ -222,25 +222,40 @@ impl PaneRenderer {
                         egui::Sense::hover(),
                     );
 
-                    let (color, block_type, block_idx) =
-                        if is_left && imara_block.is_pure_insertion() {
-                            (
-                                egui::Color32::from_rgba_unmultiplied(76, 175, 80, 128),
-                                "addition",
-                                imara_block.right_range.start,
-                            )
-                        } else {
-                            (
-                                egui::Color32::from_rgba_unmultiplied(244, 67, 54, 128),
-                                "deletion",
-                                imara_block.left_range.start,
-                            )
-                        };
+                    let adjusted_rect = crushed_rect.translate(Vec2::new(0.0, 1.0));
 
-                    ui.painter().rect_filled(crushed_rect, 0.0, color);
+                    let (color, block_type, block_idx) = if is_left
+                        && imara_block.is_pure_insertion()
+                    {
+                        let base = theme.addition_background;
+                        (
+                            egui::Color32::from_rgba_unmultiplied(
+                                base.r(),
+                                base.g(),
+                                base.b(),
+                                base.a(),
+                            ),
+                            "addition",
+                            imara_block.right_range.start,
+                        )
+                    } else {
+                        let base = theme.deletion_background;
+                        (
+                            egui::Color32::from_rgba_unmultiplied(
+                                base.r(),
+                                base.g(),
+                                base.b(),
+                                base.a(),
+                            ),
+                            "deletion",
+                            imara_block.left_range.start,
+                        )
+                    };
+
+                    ui.painter().rect_filled(adjusted_rect, 0.0, color);
 
                     // Store crushed line info for connectors
-                    crushed_line_rects.push((block_idx, crushed_rect, block_type.to_string()));
+                    crushed_line_rects.push((block_idx, adjusted_rect, block_type.to_string()));
                 }
             }
 

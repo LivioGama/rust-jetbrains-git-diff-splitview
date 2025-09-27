@@ -1,4 +1,5 @@
-#[allow(dead_code)]
+#![allow(dead_code)]
+
 // diffsplit/src/models/diff/mod.rs
 // Diff-related data structures and types
 #[derive(Debug, Clone)]

@@ -1,38 +1,36 @@
 // src/config/app_config.rs
 // Application configuration extracted from main.rs
 
-use eframe::egui;
+/// Basic window descriptor for the custom GPUI runtime
+#[derive(Debug, Clone, Copy)]
+pub struct WindowDescriptor {
+    pub width: u32,
+    pub height: u32,
+    pub min_width: u32,
+    pub min_height: u32,
+}
+
+impl Default for WindowDescriptor {
+    fn default() -> Self {
+        Self {
+            width: 1600,
+            height: 1000,
+            min_width: 960,
+            min_height: 720,
+        }
+    }
+}
 
 /// Application configuration for window and runtime settings
 pub struct WindowConfig;
 
 impl WindowConfig {
-    /// Get eframe native options for window setup (extracted from main.rs lines 53-65)
-    pub fn get_window_options() -> eframe::NativeOptions {
-        eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_inner_size([1600.0, 1000.0])
-                .with_resizable(true)
-                .with_visible(true)
-                .with_transparent(false)
-                .with_decorations(cfg!(not(any(
-                    target_os = "ios",
-                    target_os = "android",
-                    target_arch = "wasm32"
-                ))))
-                .with_window_level(egui::WindowLevel::Normal),
-            centered: true,
-            // Add hardware acceleration settings for better compatibility
-            hardware_acceleration: eframe::HardwareAcceleration::Preferred,
-            ..Default::default()
-        }
+    pub fn default_window_descriptor() -> WindowDescriptor {
+        WindowDescriptor::default()
     }
 
-    /// Get line height from config manager (extracted from main.rs lines 173-176)
+    /// Get line height from config manager
     pub fn get_line_height(config_manager: &crate::config::ConfigManager) -> f32 {
-        config_manager
-            .get_config()
-            .fonts
-            .calculated_buffer_line_height()
+        config_manager.get_font_manager().buffer_line_height()
     }
 }

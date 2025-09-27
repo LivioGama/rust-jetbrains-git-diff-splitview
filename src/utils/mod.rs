@@ -1,5 +1,6 @@
 // diffsplit/src/utils/mod.rs
 // Common utilities module
+#![allow(dead_code)]
 
 use std::fs;
 use std::path::Path;
@@ -106,42 +107,6 @@ pub mod math_utils {
         let dx = x2 - x1;
         let dy = y2 - y1;
         (dx * dx + dy * dy).sqrt()
-    }
-}
-
-/// Geometry utilities for UI calculations
-pub mod geometry_utils {
-    use egui::Pos2;
-
-    /// Calculate the center point between two positions
-    pub fn center(a: Pos2, b: Pos2) -> Pos2 {
-        Pos2::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0)
-    }
-
-    /// Calculate control point for a quadratic Bezier curve
-    pub fn quadratic_control_point(start: Pos2, end: Pos2, height: f32) -> Pos2 {
-        let center = center(start, end);
-        let direction = Pos2::new(end.x - start.x, end.y - start.y);
-        let perpendicular = Pos2::new(-direction.y, direction.x);
-        let length = (perpendicular.x * perpendicular.x + perpendicular.y * perpendicular.y).sqrt();
-
-        if length > 0.0 {
-            let normalized = Pos2::new(perpendicular.x / length, perpendicular.y / length);
-            Pos2::new(
-                center.x + normalized.x * height,
-                center.y + normalized.y * height,
-            )
-        } else {
-            center
-        }
-    }
-
-    /// Check if a point is inside a rectangle
-    pub fn point_in_rect(point: Pos2, rect_min: Pos2, rect_max: Pos2) -> bool {
-        point.x >= rect_min.x
-            && point.x <= rect_max.x
-            && point.y >= rect_min.y
-            && point.y <= rect_max.y
     }
 }
 
@@ -265,14 +230,6 @@ mod tests {
         assert_eq!(math_utils::lerp(0.0, 10.0, 0.5), 5.0);
         assert_eq!(math_utils::lerp(0.0, 10.0, 0.0), 0.0);
         assert_eq!(math_utils::lerp(0.0, 10.0, 1.0), 10.0);
-    }
-
-    #[test]
-    fn test_geometry_center() {
-        let a = egui::Pos2::new(0.0, 0.0);
-        let b = egui::Pos2::new(10.0, 10.0);
-        let center = geometry_utils::center(a, b);
-        assert_eq!(center, egui::Pos2::new(5.0, 5.0));
     }
 
     #[test]

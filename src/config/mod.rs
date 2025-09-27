@@ -28,7 +28,7 @@ pub struct LayoutConfig {
 impl Default for LayoutConfig {
     fn default() -> Self {
         Self {
-            connector_column_width: 45.0,
+            connector_column_width: 56.0,
             pane_padding: 10.0,
         }
     }
