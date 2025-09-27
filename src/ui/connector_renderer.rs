@@ -92,11 +92,11 @@ impl ConnectorRenderer {
         let curve_amplitude = (left_end_y - left_start_y)
             .abs()
             .max((right_end_y - right_start_y).abs())
-            * 0.5;
+            * 0.3;
 
         // For S-curve: first control point goes outward, second comes back inward
-        let control1_x = connector_width * 0.4;
-        let control2_x = connector_width * 0.6;
+        let control1_x = connector_width * 0.35;
+        let control2_x = connector_width * 0.65;
 
         // Calculate Y positions to create the S-shape
         let control1_y = if left_center_y < right_center_y {
@@ -144,6 +144,9 @@ impl ConnectorRenderer {
             viewport_height
         );
         let line_height = self.theme.line_height();
+        let vertical_padding = 4.0;
+        let line_stride = line_height + vertical_padding;
+        let header_offset_px = header_offset.0;
 
         // Create S-shaped connectors between block corners like JetBrains diff viewer
         let s_connectors: Vec<_> = imara_analysis
@@ -168,28 +171,30 @@ impl ConnectorRenderer {
                 // These are document-relative positions, then adjusted for scroll to get viewport positions
                 let left_start_y_doc = if block.left_range.is_empty() {
                     // For insertions, use the right side position
-                    (block.right_range.start as f32) * line_height + header_offset.0
+                    (block.right_range.start as f32) * line_stride + header_offset_px
                 } else {
-                    (block.left_range.start as f32) * line_height + header_offset.0
+                    (block.left_range.start as f32) * line_stride + header_offset_px
                 };
 
                 let left_end_y_doc = if block.left_range.is_empty() {
-                    left_start_y_doc + (block.right_range.end - block.right_range.start) as f32 * line_height
+                    left_start_y_doc
+                        + (block.right_range.end - block.right_range.start) as f32 * line_stride
                 } else {
-                    (block.left_range.end as f32) * line_height + header_offset.0
+                    (block.left_range.end as f32) * line_stride + header_offset_px
                 };
 
                 let right_start_y_doc = if block.right_range.is_empty() {
                     // For deletions, use the left side position
-                    (block.left_range.start as f32) * line_height + header_offset.0
+                    (block.left_range.start as f32) * line_stride + header_offset_px
                 } else {
-                    (block.right_range.start as f32) * line_height + header_offset.0
+                    (block.right_range.start as f32) * line_stride + header_offset_px
                 };
 
                 let right_end_y_doc = if block.right_range.is_empty() {
-                    right_start_y_doc + (block.left_range.end - block.left_range.start) as f32 * line_height
+                    right_start_y_doc
+                        + (block.left_range.end - block.left_range.start) as f32 * line_stride
                 } else {
-                    (block.right_range.end as f32) * line_height + header_offset.0
+                    (block.right_range.end as f32) * line_stride + header_offset_px
                 };
 
                 // Convert document positions to viewport positions by subtracting scroll offsets
@@ -290,26 +295,15 @@ impl ConnectorRenderer {
         for &(_, _, _, _, left_start_y, left_end_y, right_start_y, right_end_y, color, _) in
             &s_connectors
         {
-            let min_y = left_start_y
-                .min(left_end_y)
-                .min(right_start_y)
-                .min(right_end_y);
-            let max_y = left_start_y
-                .max(left_end_y)
-                .max(right_start_y)
-                .max(right_end_y);
-            let area_height = max_y - min_y;
-            let background_color = color.opacity(0.6);
-            elements.push(
-                div()
-                    .absolute()
-                    .top(px(min_y))
-                    .left(px(0.0))
-                    .w(px(connector_width))
-                    .h(px(area_height))
-                    .bg(background_color)
-                    .into_any_element(),
-            );
+            elements.push(self.create_dual_curve_connector(
+                0.0,
+                left_start_y,
+                left_end_y,
+                connector_width,
+                right_start_y,
+                right_end_y,
+                color,
+            ));
         }
 
         // Create curve elements with 50 segments for smoother approximation
@@ -321,7 +315,7 @@ impl ConnectorRenderer {
 
         // Calculate document height based on maximum lines for proper connector positioning
         let max_lines = old_lines.len().max(new_lines.len());
-        let document_height = max_lines as f32 * line_height + header_offset.0;
+        let document_height = max_lines as f32 * line_stride + header_offset_px;
 
         div()
             .w(px(connector_width))
@@ -330,5 +324,140 @@ impl ConnectorRenderer {
             .relative()
             .children(elements)
             .into_any_element()
+    }
+
+    /// Create a dual-curve ribbon connector that fills the area between top and bottom curves
+    fn create_dual_curve_connector(
+        &self,
+        left_x: f32,
+        left_y_start: f32,
+        left_y_end: f32,
+        right_x: f32,
+        right_y_start: f32,
+        right_y_end: f32,
+        color: gpui::Hsla,
+    ) -> gpui::AnyElement {
+        let segments = 50;
+        let control_point_offset = (right_x - left_x) * 0.35;
+
+        // Generate top curve points
+        let mut top_points = Vec::new();
+        let mut bottom_points = Vec::new();
+
+        for i in 0..=segments {
+            let t = i as f32 / segments as f32;
+
+            // Top curve (left_start to right_start)
+            let top_point = self.cubic_bezier(
+                (left_x, left_y_start),
+                (left_x + control_point_offset, left_y_start),
+                (right_x - control_point_offset, right_y_start),
+                (right_x, right_y_start),
+                t,
+            );
+            top_points.push(top_point);
+
+            // Bottom curve (left_end to right_end)
+            let bottom_point = self.cubic_bezier(
+                (left_x, left_y_end),
+                (left_x + control_point_offset, left_y_end),
+                (right_x - control_point_offset, right_y_end),
+                (right_x, right_y_end),
+                t,
+            );
+            bottom_points.push(bottom_point);
+        }
+
+        // Create ribbon by filling between top and bottom curves
+        let mut elements = Vec::new();
+
+        for i in 0..segments {
+            let top_left = top_points[i];
+            let top_right = top_points[i + 1];
+            let bottom_left = bottom_points[i];
+            let bottom_right = bottom_points[i + 1];
+
+            // Calculate the rectangular strip between curves
+            let min_x = top_left
+                .0
+                .min(top_right.0)
+                .min(bottom_left.0)
+                .min(bottom_right.0);
+            let max_x = top_left
+                .0
+                .max(top_right.0)
+                .max(bottom_left.0)
+                .max(bottom_right.0);
+            let min_y = top_left
+                .1
+                .min(top_right.1)
+                .min(bottom_left.1)
+                .min(bottom_right.1);
+            let max_y = top_left
+                .1
+                .max(top_right.1)
+                .max(bottom_left.1)
+                .max(bottom_right.1);
+
+            elements.push(
+                div()
+                    .absolute()
+                    .left(px(min_x))
+                    .top(px(min_y))
+                    .w(px(max_x - min_x))
+                    .h(px(max_y - min_y))
+                    .bg(color)
+                    .into_any_element(),
+            );
+        }
+
+        // Find overall bounds for container
+        let all_points = [&top_points[..], &bottom_points[..]].concat();
+        let min_x = all_points
+            .iter()
+            .map(|(x, _)| *x)
+            .fold(f32::INFINITY, f32::min);
+        let max_x = all_points
+            .iter()
+            .map(|(x, _)| *x)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let min_y = all_points
+            .iter()
+            .map(|(_, y)| *y)
+            .fold(f32::INFINITY, f32::min);
+        let max_y = all_points
+            .iter()
+            .map(|(_, y)| *y)
+            .fold(f32::NEG_INFINITY, f32::max);
+
+        div()
+            .absolute()
+            .left(px(min_x))
+            .top(px(min_y))
+            .w(px(max_x - min_x))
+            .h(px(max_y - min_y))
+            .children(elements)
+            .into_any_element()
+    }
+
+    /// Cubic Bezier curve calculation helper
+    fn cubic_bezier(
+        &self,
+        p0: (f32, f32),
+        p1: (f32, f32),
+        p2: (f32, f32),
+        p3: (f32, f32),
+        t: f32,
+    ) -> (f32, f32) {
+        let mt = 1.0 - t;
+        let mt2 = mt * mt;
+        let mt3 = mt2 * mt;
+        let t2 = t * t;
+        let t3 = t2 * t;
+
+        let x = mt3 * p0.0 + 3.0 * mt2 * t * p1.0 + 3.0 * mt * t2 * p2.0 + t3 * p3.0;
+        let y = mt3 * p0.1 + 3.0 * mt2 * t * p1.1 + 3.0 * mt * t2 * p2.1 + t3 * p3.1;
+
+        (x, y)
     }
 }

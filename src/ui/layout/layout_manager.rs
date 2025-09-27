@@ -8,6 +8,7 @@ use crate::theme::JetBrainsTheme;
 use gpui::*;
 
 use super::connectors::{ConnectorState, ConnectorUtils};
+use crate::ui::ConnectorRenderer;
 
 /// Layout manager for the diff viewer
 pub struct LayoutManager {
@@ -84,14 +85,8 @@ impl LayoutManager {
         );
 
         // Create connector renderer with stored rectangle data
-        let connector_gutter = self.create_connector_gutter(
-            &connector_state,
-            scroll_sync,
-            theme,
-            imara_analysis,
-            connector_width,
-            viewport_height,
-        );
+        let connector_gutter =
+            self.create_connector_gutter(&connector_state, theme, imara_analysis, connector_width);
 
         div()
             .h_full()
@@ -125,11 +120,9 @@ impl LayoutManager {
     fn create_connector_gutter(
         &self,
         connector_state: &ConnectorState,
-        _scroll_sync: &ScrollSync,
         theme: &JetBrainsTheme,
         imara_analysis: &ImaraDiffAnalysis,
         connector_width: Pixels,
-        viewport_height: f32,
     ) -> gpui::AnyElement {
         // Only render connectors if we have valid rectangle data
         if !connector_state.has_valid_rects() {
@@ -269,6 +262,86 @@ impl LayoutManager {
         elements
     }
 
+    /// Create a full-width connector element that spans the entire gutter
+    fn create_full_width_connector(
+        &self,
+        connector_state: &ConnectorState,
+        block: &crate::diff::imara::ImaraDiffBlock,
+        left_x: f32,
+        right_x: f32,
+        color: gpui::Hsla,
+    ) -> Option<gpui::AnyElement> {
+        let default_bounds = gpui::Bounds::default();
+        let left_start_rect = connector_state
+            .get_left_rect(block.left_range.start)
+            .unwrap_or(&default_bounds);
+        let left_end_rect = connector_state
+            .get_left_rect(block.left_range.end.saturating_sub(1))
+            .unwrap_or(left_start_rect);
+        let right_start_rect = connector_state
+            .get_right_rect(block.right_range.start)
+            .unwrap_or(&default_bounds);
+        let right_end_rect = connector_state
+            .get_right_rect(block.right_range.end.saturating_sub(1))
+            .unwrap_or(right_start_rect);
+
+        let (mut left_y_start, mut left_y_end, mut right_y_start, mut right_y_end) =
+            ConnectorUtils::calculate_connector_coords(
+                left_start_rect,
+                left_end_rect,
+                right_start_rect,
+                right_end_rect,
+                connector_state.left_scroll_offset,
+                connector_state.right_scroll_offset,
+            );
+
+        eprintln!(
+            "[DEBUG] Rect bounds -> left_start: {:?}, left_end: {:?}, right_start: {:?}, right_end: {:?}",
+            left_start_rect,
+            left_end_rect,
+            right_start_rect,
+            right_end_rect
+        );
+
+        let left_block_height = left_y_end - left_y_start;
+        let right_block_height = right_y_end - right_y_start;
+
+        eprintln!(
+            "[DEBUG] Block heights -> left={:.1}, right={:.1}, delta={:.1}",
+            left_block_height,
+            right_block_height,
+            (right_block_height - left_block_height).abs()
+        );
+
+        eprintln!(
+            "[DEBUG] Raw connector coords: left=({:.1}, {:.1}), right=({:.1}, {:.1}), scroll_offsets=({:.1}, {:.1})",
+            left_y_start,
+            left_y_end,
+            right_y_start,
+            right_y_end,
+            connector_state.left_scroll_offset,
+            connector_state.right_scroll_offset
+        );
+
+        let adjusted_left_y_end = left_y_end + 1.0;
+        let adjusted_right_y_end = right_y_end + 1.0;
+
+        eprintln!(
+            "[DEBUG] Final connector coords: left=({:.1}, {:.1}), right=({:.1}, {:.1})",
+            left_y_start, adjusted_left_y_end, right_y_start, adjusted_right_y_end
+        );
+
+        Some(self.create_dual_curve_connector(
+            left_x,
+            left_y_start,
+            adjusted_left_y_end,
+            right_x,
+            right_y_start,
+            adjusted_right_y_end,
+            color,
+        ))
+    }
+
     /// Create a dual-curve ribbon connector that fills the area between top and bottom curves
     fn create_dual_curve_connector(
         &self,
@@ -383,86 +456,6 @@ impl LayoutManager {
             .h(px(max_y - min_y))
             .children(elements)
             .into_any_element()
-    }
-
-    /// Create a full-width connector element that spans the entire gutter
-    fn create_full_width_connector(
-        &self,
-        connector_state: &ConnectorState,
-        block: &crate::diff::imara::ImaraDiffBlock,
-        left_x: f32,
-        right_x: f32,
-        color: gpui::Hsla,
-    ) -> Option<gpui::AnyElement> {
-        let default_bounds = gpui::Bounds::default();
-        let left_start_rect = connector_state
-            .get_left_rect(block.left_range.start)
-            .unwrap_or(&default_bounds);
-        let left_end_rect = connector_state
-            .get_left_rect(block.left_range.end.saturating_sub(1))
-            .unwrap_or(left_start_rect);
-        let right_start_rect = connector_state
-            .get_right_rect(block.right_range.start)
-            .unwrap_or(&default_bounds);
-        let right_end_rect = connector_state
-            .get_right_rect(block.right_range.end.saturating_sub(1))
-            .unwrap_or(right_start_rect);
-
-        let (mut left_y_start, mut left_y_end, mut right_y_start, mut right_y_end) =
-            ConnectorUtils::calculate_connector_coords(
-                left_start_rect,
-                left_end_rect,
-                right_start_rect,
-                right_end_rect,
-                connector_state.left_scroll_offset,
-                connector_state.right_scroll_offset,
-            );
-
-        eprintln!(
-            "[DEBUG] Rect bounds -> left_start: {:?}, left_end: {:?}, right_start: {:?}, right_end: {:?}",
-            left_start_rect,
-            left_end_rect,
-            right_start_rect,
-            right_end_rect
-        );
-
-        let left_block_height = left_y_end - left_y_start;
-        let right_block_height = right_y_end - right_y_start;
-
-        eprintln!(
-            "[DEBUG] Block heights -> left={:.1}, right={:.1}, delta={:.1}",
-            left_block_height,
-            right_block_height,
-            (right_block_height - left_block_height).abs()
-        );
-
-        eprintln!(
-            "[DEBUG] Raw connector coords: left=({:.1}, {:.1}), right=({:.1}, {:.1}), scroll_offsets=({:.1}, {:.1})",
-            left_y_start,
-            left_y_end,
-            right_y_start,
-            right_y_end,
-            connector_state.left_scroll_offset,
-            connector_state.right_scroll_offset
-        );
-
-        let adjusted_left_y_end = left_y_end + 1.0;
-        let adjusted_right_y_end = right_y_end + 1.0;
-
-        eprintln!(
-            "[DEBUG] Final connector coords: left=({:.1}, {:.1}), right=({:.1}, {:.1})",
-            left_y_start, adjusted_left_y_end, right_y_start, adjusted_right_y_end
-        );
-
-        Some(self.create_dual_curve_connector(
-            left_x,
-            left_y_start,
-            adjusted_left_y_end,
-            right_x,
-            right_y_start,
-            adjusted_right_y_end,
-            color,
-        ))
     }
 
     /// Cubic Bezier curve calculation helper

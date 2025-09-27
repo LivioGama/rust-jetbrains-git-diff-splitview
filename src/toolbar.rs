@@ -66,6 +66,22 @@ impl ToolbarState {
             DiffMode::DefaultDemo => None,
         }
     }
+
+    pub fn go_previous(&mut self) {
+        if self.can_go_previous() {
+            self.current_file_index -= 1;
+        }
+    }
+
+    pub fn go_next(&mut self) {
+        if self.can_go_next() {
+            self.current_file_index += 1;
+        }
+    }
+
+    pub fn go_to_default(&mut self) {
+        self.current_mode = DiffMode::DefaultDemo;
+    }
 }
 
 pub struct ToolbarHandler {

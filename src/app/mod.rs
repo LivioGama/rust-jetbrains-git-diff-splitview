@@ -24,7 +24,6 @@ pub struct DiffViewerApp {
     pub layout_manager: LayoutManager,
     pub config_manager: ConfigManager,
     pub toolbar_handler: ToolbarHandler,
-    pub connector_renderer: ConnectorRenderer,
 }
 
 impl DiffViewerApp {
@@ -71,7 +70,6 @@ impl DiffViewerApp {
             layout_manager: LayoutManager::new(config_manager.get_config().layout.clone()),
             config_manager,
             toolbar_handler: ToolbarHandler::new(filtered_files),
-            connector_renderer: ConnectorRenderer::new(theme.clone()),
         };
 
         // Load first project file's diff if there are project files
@@ -202,76 +200,27 @@ impl DiffViewerApp {
     fn load_default_demo_diff(&mut self) {
         use crate::diff::imara::compute_imara_diff_default;
         use crate::diff::parser::create_complete_side_by_side_with_diff;
-        use crate::git::GitOps;
         use crate::sync::{build_anchors_from_blocks, build_mapping_segments};
 
         eprintln!("Loading default demo diff");
 
-        let git_ops = GitOps::new("/Users/livio/Documents/anbiti-apps".to_string());
-        let file_path = "apps/app/app/Providers.tsx";
-
-        // Read current content from HEAD
-        let current_content = match git_ops.show_file("HEAD~1", file_path) {
-            crate::git::GitResult {
-                success: true,
-                stdout,
-                ..
-            } => {
-                eprintln!("✅ Got current content from HEAD ({} chars)", stdout.len());
-                stdout
-            }
-            _ => {
-                eprintln!("❌ Failed to read current from git, using fallback");
-                "import React from 'react';\nimport { BrowserRouter as Router, Routes, Route } from 'react-router-dom';\nimport { ThemeProvider } from './theme';\nimport { AuthProvider } from './auth';\nimport { NotificationProvider } from './notifications';\n\nfunction AppProviders({ children }) {\n  return (\n    <ThemeProvider>\n      <AuthProvider>\n        <NotificationProvider>\n          <Router>\n            {children}\n          </Router>\n        </NotificationProvider>\n      </AuthProvider>\n    </ThemeProvider>\n  );\n}\n\nexport default AppProviders;\n".to_string()
-            }
-        };
-
-        // Read original content from HEAD~1
-        let original_content = match git_ops.show_file("cb2752b3", file_path) {
-            crate::git::GitResult {
-                success: true,
-                stdout,
-                ..
-            } => {
-                eprintln!(
-                    "✅ Got original content from HEAD~1 ({} chars)",
-                    stdout.len()
-                );
-                stdout
-            }
-            _ => {
-                eprintln!("❌ Failed to read original from git, using fallback");
-                "function App() {\n  return <div>Hello World</div>;\n}\n\nexport default App;\n"
-                    .to_string()
-            }
-        };
-
-        // Get diff between HEAD and HEAD~1 (reverse direction)
-        let diff_text = match git_ops.diff_file(Some("HEAD"), Some("HEAD~1"), file_path) {
-            crate::git::GitResult {
-                success: true,
-                stdout,
-                ..
-            } => {
-                eprintln!("✅ Got diff content ({} chars)", stdout.len());
-                stdout
-            }
-            _ => {
-                eprintln!("❌ Failed to read diff, using fallback");
-                "diff --git a/apps/app/app/Providers.tsx b/apps/app/app/Providers.tsx\nindex dcc2893b..cb2752b 100644\n--- a/apps/app/app/Providers.tsx\n+++ b/apps/app/app/Providers.tsx\n@@ -1,6 +1,5 @@\n import React from 'react';\n import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';\n import { ThemeProvider } from './theme';\n import { AuthProvider } from './auth';\n-import { NotificationProvider } from './notifications';\n\n function AppProviders({ children }) {\n   return (\n@@ -7,9 +6,6 @@\n       <AuthProvider>\n-        <NotificationProvider>\n           <Router>\n             {children}\n-          </Router>\n-        </NotificationProvider>\n       </AuthProvider>\n     </ThemeProvider>\n   );\n }\n".to_string()
-            }
-        };
+        // Use hardcoded demo content directly
+        let demo_file = "demo.tsx";
+        let demo_original =
+            "function App() {\n  return <div>Hello World</div>;\n}\n\nexport default App;\n"
+                .to_string();
+        let demo_current = "import React from 'react';\nimport { BrowserRouter as Router, Routes, Route } from 'react-router-dom';\nimport { ThemeProvider } from './theme';\nimport { AuthProvider } from './auth';\nimport { NotificationProvider } from './notifications';\n\nfunction AppProviders({ children }) {\n  return (\n    <ThemeProvider>\n      <AuthProvider>\n        <NotificationProvider>\n          <Router>\n            {children}\n          </Router>\n        </NotificationProvider>\n      </AuthProvider>\n    </ThemeProvider>\n  );\n}\n\nexport default AppProviders;\n".to_string();
 
         let (old_lines, new_lines, change_blocks) =
-            create_complete_side_by_side_with_diff(&original_content, &current_content, &diff_text);
-        let imara_analysis = compute_imara_diff_default(&original_content, &current_content);
+            create_complete_side_by_side_with_diff(&demo_original, &demo_current, "");
+        let imara_analysis = compute_imara_diff_default(&demo_original, &demo_current);
 
         let line_height = crate::config::WindowConfig::get_line_height(&self.config_manager);
         let anchors = build_anchors_from_blocks(&change_blocks, line_height);
         let mapping_segments = build_mapping_segments(&anchors);
 
         self.state_manager.update_state(|state| {
-            state.current_file = file_path.to_string();
+            state.current_file = demo_file.to_string();
             state.left_lines = old_lines;
             state.right_lines = new_lines;
             state.change_blocks = change_blocks.to_vec();
@@ -292,9 +241,9 @@ impl gpui::Render for DiffViewerApp {
     fn render(
         &mut self,
         _window: &mut gpui::Window,
-        _cx: &mut gpui::Context<Self>,
+        cx: &mut gpui::Context<Self>,
     ) -> impl gpui::IntoElement {
-        self.view()
+        self.view(cx)
     }
 }
 
@@ -332,21 +281,21 @@ impl DiffViewerApp {
         });
     }
 
-    pub fn view(&self) -> gpui::AnyElement {
+    pub fn view(&mut self, cx: &mut gpui::Context<Self>) -> gpui::AnyElement {
         // Render the main layout using GPUI elements
         div()
             .h_full()
             .w_full()
             .flex()
             .flex_col()
-            .child(self.render_toolbar())
+            .child(self.render_toolbar(cx))
             .child(div().h(px(1.0)).bg(rgb(0x3c3c3c)))
             .child(self.render_main_content())
             .into_any_element()
     }
 
-    fn render_toolbar(&self) -> gpui::AnyElement {
-        // Simplified toolbar rendering
+    fn render_toolbar(&self, cx: &mut gpui::Context<Self>) -> gpui::AnyElement {
+        // Toolbar with buttons
         div()
             .h(px(30.0))
             .w_full()
@@ -355,6 +304,89 @@ impl DiffViewerApp {
             .flex_row()
             .items_center()
             .child(div().px(px(16.0)).child("JetBrains Diff Viewer - GPUI"))
+            .child(div().flex_1())
+            .child(
+                div()
+                    .child("⬅ Previous")
+                    .bg(if self.toolbar_handler.get_state().can_go_previous() {
+                        rgb(0x4a4a4a)
+                    } else {
+                        rgb(0x2a2a2a)
+                    })
+                    .px(px(8.0))
+                    .py(px(4.0))
+                    .rounded(px(4.0))
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        cx.listener(|this, _event, _window, cx| {
+                            if this.toolbar_handler.get_state().can_go_previous() {
+                                this.toolbar_handler.get_state_mut().go_previous();
+                                this.handle_toolbar_action(crate::toolbar::ToolbarAction::Previous);
+                                cx.notify();
+                            }
+                        }),
+                    ),
+            )
+            .child(
+                div()
+                    .child("Next ➡")
+                    .bg(if self.toolbar_handler.get_state().can_go_next() {
+                        rgb(0x4a4a4a)
+                    } else {
+                        rgb(0x2a2a2a)
+                    })
+                    .px(px(8.0))
+                    .py(px(4.0))
+                    .rounded(px(4.0))
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        cx.listener(|this, _event, _window, cx| {
+                            if this.toolbar_handler.get_state().can_go_next() {
+                                this.toolbar_handler.get_state_mut().go_next();
+                                this.handle_toolbar_action(crate::toolbar::ToolbarAction::Next);
+                                cx.notify();
+                            }
+                        }),
+                    ),
+            )
+            .child(
+                div()
+                    .child("Demo")
+                    .bg(rgb(0x4a4a4a))
+                    .px(px(8.0))
+                    .py(px(4.0))
+                    .rounded(px(4.0))
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        cx.listener(|this, _event, _window, cx| {
+                            this.toolbar_handler.get_state_mut().go_to_default();
+                            this.handle_toolbar_action(crate::toolbar::ToolbarAction::Default);
+                            cx.notify();
+                        }),
+                    ),
+            )
+            .child(
+                div()
+                    .px(px(16.0))
+                    .child(match self.toolbar_handler.get_state().current_mode {
+                        crate::toolbar::DiffMode::ProjectFile => {
+                            let index = self.toolbar_handler.get_state().current_file_index;
+                            if let Some(file) =
+                                self.toolbar_handler.get_state().project_files.get(index)
+                            {
+                                format!(
+                                    "File: {} ({}/{})",
+                                    file.display(),
+                                    index + 1,
+                                    self.toolbar_handler.get_state().project_files.len()
+                                )
+                            } else {
+                                "No file".to_string()
+                            }
+                        }
+                        crate::toolbar::DiffMode::DefaultDemo => "Demo Diff".to_string(),
+                    }),
+            )
             .into_any_element()
     }
 

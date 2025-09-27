@@ -46,131 +46,241 @@ pub fn create_complete_side_by_side_with_diff(
     current: &str,
     _diff_text: &str, // Ignored - we compute our own diff with imara
 ) -> (Vec<DisplayLine>, Vec<DisplayLine>, Vec<ChangeBlock>) {
-    use crate::diff::imara::compute_imara_diff_default;
+    use crate::diff::imara::{compute_imara_diff_default, ImaraBlockOperation};
 
-    // Split content into lines
+    // Split content into lines for lookups
     let old_lines: Vec<&str> = original.lines().collect();
     let new_lines: Vec<&str> = current.lines().collect();
 
-    // Compute imara diff analysis using histogram algorithm
+    // Compute semantic blocks that describe the relationship between documents
     let imara_analysis = compute_imara_diff_default(original, current);
 
-    // Create display lines with default context type
-    let mut left_display_lines: Vec<DisplayLine> = old_lines
-        .iter()
-        .enumerate()
-        .map(|(i, line)| {
-            DisplayLine::new(line.to_string(), LineType::Context).with_line_number(i + 1)
-        })
-        .collect();
-
-    let mut right_display_lines: Vec<DisplayLine> = new_lines
-        .iter()
-        .enumerate()
-        .map(|(i, line)| {
-            DisplayLine::new(line.to_string(), LineType::Context).with_line_number(i + 1)
-        })
-        .collect();
-
-    // Apply imara diff analysis to mark changed lines
-    for imara_block in &imara_analysis.blocks {
-        if !imara_block.is_change() {
-            continue;
-        }
-
-        // Handle different block operations
-        match imara_block.operation {
-            crate::diff::imara::ImaraBlockOperation::Modify => {
-                // For Modify blocks, use Modification type to get blue background
-                if !imara_block.left_range.is_empty() {
-                    for line_idx in imara_block.left_range.clone() {
-                        if line_idx < left_display_lines.len() {
-                            left_display_lines[line_idx].line_type = LineType::Modification;
-                        }
-                    }
-                }
-
-                if !imara_block.right_range.is_empty() {
-                    for line_idx in imara_block.right_range.clone() {
-                        if line_idx < right_display_lines.len() {
-                            right_display_lines[line_idx].line_type = LineType::Modification;
-                        }
-                    }
-                }
-
-                // Add word-level highlights for modified lines
-                for i in 0..imara_block
-                    .left_range
-                    .len()
-                    .min(imara_block.right_range.len())
-                {
-                    let left_idx = imara_block.left_range.start + i;
-                    let right_idx = imara_block.right_range.start + i;
-                    if left_idx < left_display_lines.len() && right_idx < right_display_lines.len()
-                    {
-                        let old_line = &old_lines[left_idx];
-                        let new_line = &new_lines[right_idx];
-                        let (left_highlights, right_highlights) =
-                            compute_word_highlights(old_line, new_line);
-                        left_display_lines[left_idx].word_highlights = left_highlights;
-                        right_display_lines[right_idx].word_highlights = right_highlights;
-                    }
-                }
-            }
-            crate::diff::imara::ImaraBlockOperation::Insert => {
-                // Pure insertion: mark right side as Addition
-                if !imara_block.right_range.is_empty() {
-                    for line_idx in imara_block.right_range.clone() {
-                        if line_idx < right_display_lines.len() {
-                            right_display_lines[line_idx].line_type = LineType::Addition;
-                        }
-                    }
-                }
-            }
-            crate::diff::imara::ImaraBlockOperation::Delete => {
-                // Pure deletion: mark left side as Deletion
-                if !imara_block.left_range.is_empty() {
-                    for line_idx in imara_block.left_range.clone() {
-                        if line_idx < left_display_lines.len() {
-                            left_display_lines[line_idx].line_type = LineType::Deletion;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Create change blocks from imara-diff semantic blocks
+    // Builders for aligned panes and change navigation metadata
+    let mut left_display_lines = Vec::new();
+    let mut right_display_lines = Vec::new();
     let mut change_blocks = Vec::new();
-    for imara_block in &imara_analysis.blocks {
-        if !imara_block.is_change() {
+
+    // Track how many source lines we've already materialised
+    let mut left_cursor = 0usize;
+    let mut right_cursor = 0usize;
+
+    for block in &imara_analysis.blocks {
+        if !block.is_change() {
+            // Emit matching context before non-change blocks (if any)
+            emit_context(
+                &mut left_display_lines,
+                &mut right_display_lines,
+                &old_lines,
+                &new_lines,
+                &mut left_cursor,
+                &mut right_cursor,
+                block.left_range.start,
+                block.right_range.start,
+            );
             continue;
         }
 
-        // Create change blocks for left side (deletions)
-        if !imara_block.left_range.is_empty() {
-            change_blocks.push(ChangeBlock::new(
-                imara_block.left_range.start,
-                imara_block
-                    .left_range
-                    .end
-                    .saturating_sub(1)
-                    .max(imara_block.left_range.start),
-            ));
+        emit_context(
+            &mut left_display_lines,
+            &mut right_display_lines,
+            &old_lines,
+            &new_lines,
+            &mut left_cursor,
+            &mut right_cursor,
+            block.left_range.start,
+            block.right_range.start,
+        );
+
+        let block_start_index = left_display_lines.len();
+
+        match block.operation {
+            ImaraBlockOperation::Insert => {
+                for idx in block.right_range.clone() {
+                    let right_line =
+                        DisplayLine::new(new_lines[idx].to_string(), LineType::Addition)
+                            .with_line_number(idx + 1);
+
+                    let left_placeholder = DisplayLine {
+                        content: String::new(),
+                        line_type: LineType::Addition,
+                        original_line_num: None,
+                        word_highlights: Vec::new(),
+                    };
+
+                    push_aligned_pair(
+                        &mut left_display_lines,
+                        &mut right_display_lines,
+                        left_placeholder,
+                        right_line,
+                    );
+                }
+
+                right_cursor = block.right_range.end;
+            }
+            ImaraBlockOperation::Delete => {
+                for idx in block.left_range.clone() {
+                    let left_line =
+                        DisplayLine::new(old_lines[idx].to_string(), LineType::Deletion)
+                            .with_line_number(idx + 1);
+
+                    let right_placeholder = DisplayLine {
+                        content: String::new(),
+                        line_type: LineType::Deletion,
+                        original_line_num: None,
+                        word_highlights: Vec::new(),
+                    };
+
+                    push_aligned_pair(
+                        &mut left_display_lines,
+                        &mut right_display_lines,
+                        left_line,
+                        right_placeholder,
+                    );
+                }
+
+                left_cursor = block.left_range.end;
+            }
+            ImaraBlockOperation::Modify => {
+                let left_segment = &old_lines[block.left_range.clone()];
+                let right_segment = &new_lines[block.right_range.clone()];
+                let max_len = left_segment.len().max(right_segment.len());
+
+                for i in 0..max_len {
+                    let left_line = left_segment.get(i).map(|line| {
+                        DisplayLine::new(line.to_string(), LineType::Modification)
+                            .with_line_number(block.left_range.start + i + 1)
+                    });
+
+                    let right_line = right_segment.get(i).map(|line| {
+                        DisplayLine::new(line.to_string(), LineType::Modification)
+                            .with_line_number(block.right_range.start + i + 1)
+                    });
+
+                    match (left_line, right_line) {
+                        (Some(mut left_line), Some(mut right_line)) => {
+                            let (left_highlights, right_highlights) = compute_word_highlights(
+                                &old_lines[block.left_range.start + i],
+                                &new_lines[block.right_range.start + i],
+                            );
+                            left_line.word_highlights = left_highlights;
+                            right_line.word_highlights = right_highlights;
+                            push_aligned_pair(
+                                &mut left_display_lines,
+                                &mut right_display_lines,
+                                left_line,
+                                right_line,
+                            );
+                        }
+                        (Some(left_line), None) => {
+                            let right_placeholder = DisplayLine {
+                                content: String::new(),
+                                line_type: LineType::Deletion,
+                                original_line_num: None,
+                                word_highlights: Vec::new(),
+                            };
+                            push_aligned_pair(
+                                &mut left_display_lines,
+                                &mut right_display_lines,
+                                left_line,
+                                right_placeholder,
+                            );
+                        }
+                        (None, Some(right_line)) => {
+                            let left_placeholder = DisplayLine {
+                                content: String::new(),
+                                line_type: LineType::Addition,
+                                original_line_num: None,
+                                word_highlights: Vec::new(),
+                            };
+                            push_aligned_pair(
+                                &mut left_display_lines,
+                                &mut right_display_lines,
+                                left_placeholder,
+                                right_line,
+                            );
+                        }
+                        (None, None) => {}
+                    }
+                }
+
+                left_cursor = block.left_range.end;
+                right_cursor = block.right_range.end;
+            }
         }
 
-        // Create change blocks for right side (additions)
-        if !imara_block.right_range.is_empty() {
-            change_blocks.push(ChangeBlock::new(
-                imara_block.right_range.start,
-                imara_block
-                    .right_range
-                    .end
-                    .saturating_sub(1)
-                    .max(imara_block.right_range.start),
-            ));
+        let block_len = left_display_lines.len().saturating_sub(block_start_index);
+        if block_len > 0 {
+            let block_end_index = block_start_index + block_len - 1;
+            change_blocks.push(ChangeBlock::new(block_start_index, block_end_index));
         }
     }
+
+    // Flush any trailing context after the last block
+    emit_context(
+        &mut left_display_lines,
+        &mut right_display_lines,
+        &old_lines,
+        &new_lines,
+        &mut left_cursor,
+        &mut right_cursor,
+        old_lines.len(),
+        new_lines.len(),
+    );
+
+    debug_assert_eq!(left_display_lines.len(), right_display_lines.len());
 
     (left_display_lines, right_display_lines, change_blocks)
+}
+
+fn push_aligned_pair(
+    left_lines: &mut Vec<DisplayLine>,
+    right_lines: &mut Vec<DisplayLine>,
+    left: DisplayLine,
+    right: DisplayLine,
+) {
+    left_lines.push(left);
+    right_lines.push(right);
+}
+
+fn emit_context(
+    left_lines: &mut Vec<DisplayLine>,
+    right_lines: &mut Vec<DisplayLine>,
+    old_lines: &[&str],
+    new_lines: &[&str],
+    left_cursor: &mut usize,
+    right_cursor: &mut usize,
+    target_left: usize,
+    target_right: usize,
+) {
+    while *left_cursor < target_left || *right_cursor < target_right {
+        let left_line = if *left_cursor < target_left {
+            let line = DisplayLine::new(old_lines[*left_cursor].to_string(), LineType::Context)
+                .with_line_number(*left_cursor + 1);
+            *left_cursor += 1;
+            line
+        } else {
+            DisplayLine {
+                content: String::new(),
+                line_type: LineType::Context,
+                original_line_num: None,
+                word_highlights: Vec::new(),
+            }
+        };
+
+        let right_line = if *right_cursor < target_right {
+            let line = DisplayLine::new(new_lines[*right_cursor].to_string(), LineType::Context)
+                .with_line_number(*right_cursor + 1);
+            *right_cursor += 1;
+            line
+        } else {
+            DisplayLine {
+                content: String::new(),
+                line_type: LineType::Context,
+                original_line_num: None,
+                word_highlights: Vec::new(),
+            }
+        };
+
+        push_aligned_pair(left_lines, right_lines, left_line, right_line);
+    }
 }
