@@ -2,9 +2,7 @@
 // Application bootstrap and initialization logic extracted from main.rs
 
 use crate::actions::ActionHandler;
-use crate::app::DiffViewerApp;
 use crate::config::{ConfigManager, WindowConfig};
-
 use crate::file_ops::FileOps;
 use crate::git::GitOps;
 use crate::state::StateManager;
@@ -21,7 +19,7 @@ pub struct AppBootstrap {
 
 impl AppBootstrap {
     /// Initialize the application with all data loading and processing
-    pub fn initialize() -> Result<Self, eframe::Error> {
+    pub fn initialize() -> Result<Self, anyhow::Error> {
         println!("📊 Initializing Git operations and file operations...");
         let git_ops = GitOps::with_current_dir();
         let _file_ops = FileOps::with_default_config();
@@ -114,28 +112,4 @@ impl AppBootstrap {
         })
     }
 
-    /// Create the eframe application callback
-    pub fn create_app_callback(
-        self,
-    ) -> Box<
-        dyn FnOnce(
-            &eframe::CreationContext<'_>,
-        )
-            -> Result<Box<dyn eframe::App>, Box<dyn std::error::Error + Send + Sync>>,
-    > {
-        Box::new(move |cc| {
-            // Apply Zed font configuration to the egui context
-            let config_manager = ConfigManager::new();
-            config_manager
-                .get_font_manager()
-                .apply_to_context(&cc.egui_ctx);
-
-            // Create the application
-            Ok(Box::new(DiffViewerApp::new(
-                self.state_manager,
-                self.action_handler,
-                self.project_files,
-            )))
-        })
-    }
 }

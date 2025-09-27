@@ -1,7 +1,7 @@
 // src/syntax/colors.rs
 // JetBrains color scheme for syntax highlighting
 
-use egui::Color32;
+use crate::compat::Color32;
 use super::token_types::TokenType;
 
 /// JetBrains color scheme for syntax highlighting

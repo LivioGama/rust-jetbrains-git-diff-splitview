@@ -2,11 +2,12 @@
 // Main entry point for the JetBrains Diff Viewer
 // Clean, modular architecture with separated concerns
 
-// Removed unused import: use eframe::egui;
+use gpui::{App, AppContext, WindowOptions, WindowBounds, Pixels};
 
 // Module declarations
 mod actions;
 mod app;
+mod compat; // Compatibility layer for egui -> gpui migration
 mod config;
 mod core;
 mod diff;
@@ -23,11 +24,10 @@ mod toolbar;
 mod ui;
 mod utils;
 
-// Re-exports for convenience
-use config::WindowConfig;
+use app::DiffViewerApp;
 
-fn main() -> Result<(), eframe::Error> {
-    println!("🚀 Starting JetBrains Diff Viewer - Modular Edition");
+fn main() {
+    println!("🚀 Starting JetBrains Diff Viewer - Modular Edition (GPUI)");
 
     // Set up panic handler for better error reporting
     std::panic::set_hook(Box::new(|panic_info| {
@@ -42,15 +42,43 @@ fn main() -> Result<(), eframe::Error> {
         }
     }));
 
-    let options = WindowConfig::get_window_options();
+    App::new().run(|cx: &mut AppContext| {
+        let window_options = WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(gpui::Bounds {
+                origin: gpui::Point { 
+                    x: Pixels(0.0), 
+                    y: Pixels(0.0) 
+                },
+                size: gpui::Size {
+                    width: Pixels(1600.0),
+                    height: Pixels(1000.0),
+                },
+            })),
+            titlebar: Some(gpui::TitlebarOptions {
+                title: Some("JetBrains Diff Viewer - Modular".into()),
+                appears_transparent: false,
+                traffic_light_position: None,
+            }),
+            window_background: gpui::WindowBackgroundAppearance::Opaque,
+            focus: true,
+            show: true,
+            kind: gpui::WindowKind::Normal,
+            is_movable: true,
+            is_resizable: true,
+            is_minimizable: true,
+            display_id: None,
+            window_min_size: None,
+            app_id: None,
+            tabbing_identifier: None,
+            window_decorations: Some(gpui::WindowDecorations::Server),
+        };
 
-    // Initialize the application using the bootstrap
-    let bootstrap = crate::core::app_bootstrap::AppBootstrap::initialize()?;
-
-    // Run the application
-    eframe::run_native(
-        "JetBrains Diff Viewer - Modular",
-        options,
-        bootstrap.create_app_callback(),
-    )
+        cx.open_window(window_options, |cx| {
+            let bootstrap = crate::core::app_bootstrap::AppBootstrap::initialize()
+                .expect("Failed to initialize application");
+            
+            DiffViewerApp::new(bootstrap)
+        })
+        .expect("Failed to create window");
+    });
 }

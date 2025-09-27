@@ -2,7 +2,7 @@
 // Highlight renderer extracted from rendering/mod.rs
 
 use crate::theme::JetBrainsTheme;
-use egui::{Color32, Rect};
+use crate::compat::{Color32, Rect, Ui};
 
 /// Highlight renderer for JetBrains-style highlights
 pub struct HighlightRenderer {

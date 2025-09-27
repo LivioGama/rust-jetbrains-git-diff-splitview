@@ -1,7 +1,7 @@
 // src/rendering/text_renderer.rs
 // Text rendering logic extracted from ui/line_renderer.rs
 
-use egui::{Color32, FontId, FontFamily, Pos2, Align2};
+use crate::compat::{Color32, FontId, Pos2, Ui, Rect, Vec2};
 use crate::models::line::{DisplayLine, LineType};
 use crate::syntax::SyntaxHighlighter;
 use crate::theme::JetBrainsTheme;
@@ -158,12 +158,12 @@ impl TextRenderer {
                         }
                     };
 
-                    let highlight_rect = egui::Rect::from_min_size(
+                    let highlight_rect = Rect::from_min_size(
                         Pos2::new(
                             rect.min.x + highlight_start_x,
                             rect.min.y + (baseline_y - rect.min.y) - self.theme.buffer_font_size(),
                         ),
-                        egui::Vec2::new(highlight_width, self.theme.buffer_font_size() + 2.0),
+                        Vec2::new(highlight_width, self.theme.buffer_font_size() + 2.0),
                     );
 
                     ui.painter()

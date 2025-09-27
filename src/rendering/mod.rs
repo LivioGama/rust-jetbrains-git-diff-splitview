@@ -11,7 +11,7 @@ pub use text_renderer::*;
 
 use crate::syntax::SyntaxHighlighter;
 use crate::theme::JetBrainsTheme;
-use egui::Color32;
+use crate::compat::Color32;
 
 // Type aliases for compatibility
 #[allow(dead_code)]

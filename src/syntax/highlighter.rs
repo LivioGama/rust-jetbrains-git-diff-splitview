@@ -3,7 +3,7 @@
 
 use super::colors::JetBrainsColors;
 use super::token_types::{ColoredToken, TokenType};
-use egui::Color32;
+use crate::compat::Color32;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]

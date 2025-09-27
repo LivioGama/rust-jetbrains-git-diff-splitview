@@ -1,6 +1,10 @@
 // JetBrains theme implementation with Zed IDE font specifications
 use crate::config::{FontMetrics, LineHeightMode, ZedFontConfig, ZedFontManager, ZedSettings};
-use egui::{Color32, Stroke};
+use gpui::{Hsla, rgba};
+
+// Compatibility layer for egui types
+pub type Color32 = gpui::Hsla;
+pub type Stroke = f32; // Simplified for now
 
 #[derive(Debug, Clone)]
 pub struct JetBrainsTheme {
@@ -39,50 +43,46 @@ impl JetBrainsTheme {
         let editor_settings = ZedSettings::default();
 
         Self {
-            color_blue_500: Color32::from_rgb(33, 150, 243),
+            color_blue_500: rgba(33.0/255.0, 150.0/255.0, 243.0/255.0, 1.0),
             font_config,
             editor_settings,
             gutter_width: 45.0,
             connector_width: 45.0,
-            addition_background: Color32::from_rgb(52, 85, 52),
-            addition_foreground: Color32::from_rgb(129, 199, 132),
-            addition_gutter: Color32::from_rgb(52, 85, 52),
-            deletion_background: Color32::from_rgb(85, 56, 56), // Rouge foncé solide (pas de transparence)
-            deletion_foreground: Color32::from_rgb(239, 154, 154),
-            deletion_gutter: Color32::from_rgb(113, 113, 113),
-            modification_background: Color32::from_rgb(50, 66, 98),
-            modification_foreground: Color32::from_rgb(212, 212, 212), // Use normal foreground for modifications
-            modification_gutter: Color32::from_rgb(50, 66, 98),
-            code_foreground: Color32::from_rgb(212, 212, 212),
-            code_comment: Color32::from_rgb(106, 153, 85),
-            code_keyword: Color32::from_rgb(86, 156, 214),
-            code_string: Color32::from_rgb(206, 145, 120),
-            background: Color32::from_rgb(30, 30, 30),
-            foreground: Color32::from_rgb(212, 212, 212),
-            border: Color32::from_rgb(62, 62, 62),
-            gutter_background: Color32::from_rgb(37, 37, 38),
-            gutter_border: Color32::from_rgb(62, 62, 62),
-            connector_column: Color32::from_rgb(45, 45, 45),
-            line_numbers: Color32::from_rgb(153, 153, 153),
+            addition_background: rgba(52.0/255.0, 85.0/255.0, 52.0/255.0, 1.0),
+            addition_foreground: rgba(129.0/255.0, 199.0/255.0, 132.0/255.0, 1.0),
+            addition_gutter: rgba(52.0/255.0, 85.0/255.0, 52.0/255.0, 1.0),
+            deletion_background: rgba(85.0/255.0, 56.0/255.0, 56.0/255.0, 1.0), // Rouge foncé solide (pas de transparence)
+            deletion_foreground: rgba(239.0/255.0, 154.0/255.0, 154.0/255.0, 1.0),
+            deletion_gutter: rgba(113.0/255.0, 113.0/255.0, 113.0/255.0, 1.0),
+            modification_background: rgba(50.0/255.0, 66.0/255.0, 98.0/255.0, 1.0),
+            modification_foreground: rgba(212.0/255.0, 212.0/255.0, 212.0/255.0, 1.0), // Use normal foreground for modifications
+            modification_gutter: rgba(50.0/255.0, 66.0/255.0, 98.0/255.0, 1.0),
+            code_foreground: rgba(212.0/255.0, 212.0/255.0, 212.0/255.0, 1.0),
+            code_comment: rgba(106.0/255.0, 153.0/255.0, 85.0/255.0, 1.0),
+            code_keyword: rgba(86.0/255.0, 156.0/255.0, 214.0/255.0, 1.0),
+            code_string: rgba(206.0/255.0, 145.0/255.0, 120.0/255.0, 1.0),
+            background: rgba(30.0/255.0, 30.0/255.0, 30.0/255.0, 1.0),
+            foreground: rgba(212.0/255.0, 212.0/255.0, 212.0/255.0, 1.0),
+            border: rgba(62.0/255.0, 62.0/255.0, 62.0/255.0, 1.0),
+            gutter_background: rgba(37.0/255.0, 37.0/255.0, 38.0/255.0, 1.0),
+            gutter_border: rgba(62.0/255.0, 62.0/255.0, 62.0/255.0, 1.0),
+            connector_column: rgba(45.0/255.0, 45.0/255.0, 45.0/255.0, 1.0),
+            line_numbers: rgba(153.0/255.0, 153.0/255.0, 153.0/255.0, 1.0),
             show_line_numbers: true,
         }
     }
 
-    pub fn apply_to_context(&self, ctx: &egui::Context) {
-        // Apply Zed font configuration first
-        let font_manager = ZedFontManager::with_config(self.font_config.clone());
-        font_manager.apply_to_context(ctx);
-
-        let mut style = (*ctx.style()).clone();
-        style.visuals.dark_mode = self.background.r() < 128;
-        style.visuals.window_fill = self.background;
-        style.visuals.panel_fill = self.background;
-        style.visuals.faint_bg_color = self.background;
-        style.visuals.override_text_color = Some(self.foreground);
-        style.visuals.selection.bg_fill = self.modification_background;
-        style.visuals.selection.stroke = Stroke::new(1.0, self.modification_background);
-        ctx.set_style(style);
-    }
+    // TODO: Migrate to gpui context
+    // pub fn apply_to_context(&self, ctx: &egui::Context) {
+        // TODO: Apply gpui font configuration
+        // let font_manager = ZedFontManager::with_config(self.font_config.clone());
+        // font_manager.apply_to_context(ctx);
+        // 
+        // let mut style = (*ctx.style()).clone();
+        // style.visuals.dark_mode = self.background.r() < 128;
+        // ...
+        // ctx.set_style(style);
+    // }
 
     /// Get Zed-style buffer font size
     pub fn buffer_font_size(&self) -> f32 {
@@ -99,15 +99,15 @@ impl JetBrainsTheme {
         self.font_config.calculated_buffer_line_height()
     }
 
-    /// Get buffer font ID for egui
-    pub fn buffer_font_id(&self) -> egui::FontId {
-        self.font_config.buffer_font_id()
-    }
+    // TODO: Migrate to gpui font ID
+    // pub fn buffer_font_id(&self) -> gpui::FontId {
+    //     self.font_config.buffer_font_id()
+    // }
 
-    /// Get UI font ID for egui
-    pub fn ui_font_id(&self) -> egui::FontId {
-        self.font_config.ui_font_id()
-    }
+    // TODO: Migrate to gpui font ID
+    // pub fn ui_font_id(&self) -> gpui::FontId {
+    //     self.font_config.ui_font_id()
+    // }
 
     /// Check if ligatures are enabled
     pub fn ligatures_enabled(&self) -> bool {
@@ -173,7 +173,7 @@ impl JetBrainsTheme {
             crate::models::line::LineType::Addition => self.addition_background,
             crate::models::line::LineType::Deletion => self.deletion_background,
             crate::models::line::LineType::Modification => self.modification_background,
-            crate::models::line::LineType::Context => Color32::TRANSPARENT,
+            crate::models::line::LineType::Context => rgba(0.0, 0.0, 0.0, 0.0),
         }
     }
 
@@ -198,31 +198,31 @@ impl JetBrainsTheme {
         let editor_settings = ZedSettings::default();
 
         Self {
-            color_blue_500: Color32::from_rgb(100, 150, 200),
+            color_blue_500: rgba(100.0/255.0, 150.0/255.0, 200.0/255.0, 1.0),
             font_config,
             editor_settings,
             gutter_width: 40.0,
             connector_width: 40.0,
-            addition_background: Color32::from_rgb(40, 60, 40),
-            addition_foreground: Color32::from_rgb(100, 180, 100),
-            addition_gutter: Color32::from_rgb(40, 60, 40),
-            deletion_background: Color32::from_rgb(80, 50, 50), // Rouge plus visible
-            deletion_foreground: Color32::from_rgb(200, 120, 120),
-            deletion_gutter: Color32::from_rgb(80, 80, 80),
-            modification_background: Color32::from_rgb(40, 50, 80),
-            modification_foreground: Color32::from_rgb(200, 200, 200), // Use normal foreground for modifications
-            modification_gutter: Color32::from_rgb(40, 50, 80),
-            code_foreground: Color32::from_rgb(200, 200, 200),
-            code_comment: Color32::from_rgb(100, 140, 80),
-            code_keyword: Color32::from_rgb(80, 140, 200),
-            code_string: Color32::from_rgb(200, 140, 100),
-            background: Color32::from_rgb(40, 40, 40),
-            foreground: Color32::from_rgb(200, 200, 200),
-            border: Color32::from_rgb(80, 80, 80),
-            gutter_background: Color32::from_rgb(50, 50, 50),
-            gutter_border: Color32::from_rgb(80, 80, 80),
-            connector_column: Color32::from_rgb(60, 60, 60),
-            line_numbers: Color32::from_rgb(140, 140, 140),
+            addition_background: rgba(40.0/255.0, 60.0/255.0, 40.0/255.0, 1.0),
+            addition_foreground: rgba(100.0/255.0, 180.0/255.0, 100.0/255.0, 1.0),
+            addition_gutter: rgba(40.0/255.0, 60.0/255.0, 40.0/255.0, 1.0),
+            deletion_background: rgba(80.0/255.0, 50.0/255.0, 50.0/255.0, 1.0), // Rouge plus visible
+            deletion_foreground: rgba(200.0/255.0, 120.0/255.0, 120.0/255.0, 1.0),
+            deletion_gutter: rgba(80.0/255.0, 80.0/255.0, 80.0/255.0, 1.0),
+            modification_background: rgba(40.0/255.0, 50.0/255.0, 80.0/255.0, 1.0),
+            modification_foreground: rgba(200.0/255.0, 200.0/255.0, 200.0/255.0, 1.0), // Use normal foreground for modifications
+            modification_gutter: rgba(40.0/255.0, 50.0/255.0, 80.0/255.0, 1.0),
+            code_foreground: rgba(200.0/255.0, 200.0/255.0, 200.0/255.0, 1.0),
+            code_comment: rgba(100.0/255.0, 140.0/255.0, 80.0/255.0, 1.0),
+            code_keyword: rgba(80.0/255.0, 140.0/255.0, 200.0/255.0, 1.0),
+            code_string: rgba(200.0/255.0, 140.0/255.0, 100.0/255.0, 1.0),
+            background: rgba(40.0/255.0, 40.0/255.0, 40.0/255.0, 1.0),
+            foreground: rgba(200.0/255.0, 200.0/255.0, 200.0/255.0, 1.0),
+            border: rgba(80.0/255.0, 80.0/255.0, 80.0/255.0, 1.0),
+            gutter_background: rgba(50.0/255.0, 50.0/255.0, 50.0/255.0, 1.0),
+            gutter_border: rgba(80.0/255.0, 80.0/255.0, 80.0/255.0, 1.0),
+            connector_column: rgba(60.0/255.0, 60.0/255.0, 60.0/255.0, 1.0),
+            line_numbers: rgba(140.0/255.0, 140.0/255.0, 140.0/255.0, 1.0),
             show_line_numbers: true,
         }
     }

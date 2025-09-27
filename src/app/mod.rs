@@ -1,10 +1,10 @@
 // diffsplit/src/app/mod.rs
-use eframe::egui;
+use gpui::{Context, Window, IntoElement, Render, Styled, ParentElement, div};
 use std::path::PathBuf;
 
 use crate::actions::*;
 use crate::config::*;
-
+use crate::core::app_bootstrap::AppBootstrap;
 use crate::navigation::*;
 use crate::state::*;
 use crate::sync::*;
@@ -27,11 +27,16 @@ pub struct DiffViewerApp {
 }
 
 impl DiffViewerApp {
-    pub fn new(
-        state_manager: StateManager,
-        action_handler: ActionHandler,
-        project_files: Vec<PathBuf>,
-    ) -> Self {
+    pub fn new(bootstrap: AppBootstrap) -> Self {
+        Self::create_from_bootstrap(bootstrap)
+    }
+
+    fn create_from_bootstrap(bootstrap: AppBootstrap) -> Self {
+        let AppBootstrap {
+            state_manager,
+            action_handler,
+            project_files,
+        } = bootstrap;
         eprintln!("🎨 Creating DiffViewerApp...");
 
         // Initialize configuration with error handling
@@ -274,20 +279,8 @@ impl DiffViewerApp {
     }
 }
 
-impl eframe::App for DiffViewerApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Apply Zed font configuration and JetBrains theme
-        self.config_manager.get_font_manager().apply_to_context(ctx);
-        self.theme.apply_to_context(ctx);
-
-        // Handle keyboard navigation
-        let action = self.navigation_handler.handle_input(ctx);
-        self.handle_navigation_action(action);
-
-        // Handle toolbar keyboard input
-        let toolbar_action = self.toolbar_handler.handle_input(ctx);
-        self.handle_toolbar_action(toolbar_action);
-
+impl Render for DiffViewerApp {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<'_, Self>) -> impl IntoElement {
         // Update navigation state from current state
         let current_state = self.state_manager.get_current_state();
         self.navigation_handler.update_state(
@@ -295,47 +288,19 @@ impl eframe::App for DiffViewerApp {
             current_state.connector_curves.len(),
         );
 
-        // Update viewport height dynamically
-        let viewport_height = ctx.screen_rect().height();
-        self.scroll_sync.update_viewport_height(viewport_height);
+        // TODO: Handle keyboard navigation and toolbar input in gpui
+        // This will require adapting the navigation and toolbar handlers to work with gpui events
 
-        // Update state with current scroll positions
-        let left_scroll = self.scroll_sync.left_scroll_offset();
-        let right_scroll = self.scroll_sync.right_scroll_offset();
-        self.state_manager.update_state(|state| {
-            state.update_scroll_offsets(left_scroll, right_scroll);
-            state.set_viewport_height(viewport_height);
-        });
-
-        egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(self.theme.background))
-            .show(ctx, |ui| {
-                ui.vertical(|ui| {
-                    // Render toolbar
-                    let toolbar_button_action = self.toolbar_handler.render_toolbar(ui);
-                    self.handle_toolbar_action(toolbar_button_action);
-
-                    ui.separator();
-
-                    let current_state = self.state_manager.get_current_state();
-                    let left_lines = current_state.left_lines.clone();
-                    let right_lines = current_state.right_lines.clone();
-                    let mapping_segments = current_state.mapping_segments.clone();
-                    let imara_analysis = current_state.imara_analysis.clone();
-
-                    // Use the proper layout manager with improved connector rendering
-                    self.layout_manager.render_layout(
-                        ui,
-                        &left_lines,
-                        &right_lines,
-                        &mut self.scroll_sync,
-                        &self.theme,
-                        &mut self.line_renderer,
-                        &mut self.connector_renderer,
-                        &mapping_segments,
-                        &imara_analysis,
-                    );
-                });
-            });
+        // For now, create a basic div structure
+        div()
+            .bg(gpui::rgb(0x1e1e1e)) // Dark background similar to JetBrains theme
+            .w_full()
+            .h_full()
+            .child(
+                div()
+                    .w_full()
+                    .h_full()
+                    .child("DiffViewerApp - GPUI Migration in Progress")
+            )
     }
 }

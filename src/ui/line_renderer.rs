@@ -1,5 +1,5 @@
 // Line rendering logic for the diff viewer with Zed IDE font specifications
-use egui::{Color32, Rect};
+use crate::compat::{Color32, Rect, Ui, Vec2, Pos2, Sense};
 
 use crate::models::line::{DisplayLine, LineType};
 use crate::rendering::{HighlightRenderer, TextRenderer};
@@ -32,12 +32,12 @@ impl LineRenderer {
 
         // Ensure consistent line allocation with no extra margins
         let (rect, _response) = ui.allocate_exact_size(
-            egui::Vec2::new(available_width, line_height),
-            egui::Sense::hover(),
+            Vec2::new(available_width, line_height),
+            Sense::hover(),
         );
 
         // Ensure no item spacing affects positioning
-        ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
+        ui.style_mut().spacing.item_spacing = Vec2::ZERO;
 
         // Use Zed-style baseline calculation for proper text alignment
         let baseline_y = rect.min.y + self.theme.baseline_offset();
@@ -71,9 +71,9 @@ impl LineRenderer {
 
             if indicator_color != Color32::TRANSPARENT {
                 // Draw 2px wide colored bar on the left edge
-                let indicator_rect = egui::Rect::from_min_size(
-                    egui::Pos2::new(rect.min.x, rect.min.y),
-                    egui::Vec2::new(2.0, rect.height()),
+                let indicator_rect = Rect::from_min_size(
+                    Pos2::new(rect.min.x, rect.min.y),
+                    Vec2::new(2.0, rect.height()),
                 );
                 ui.painter()
                     .rect_filled(indicator_rect, 0.0, indicator_color);
